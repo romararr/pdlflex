@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#246bfd">
+  <title>Init Pertandingan — PadelFlex</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-page="setup">
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">PF</span>
+          <span>
+            <strong id="headerMatchName">PadelFlex</strong>
+            <small id="headerMatchMeta">Matchmaker padel tanpa database</small>
+          </span>
+        </a>
+        <div class="storage">● <span>Tersimpan otomatis di browser</span></div>
+      </div>
+    </header>
+
+    <main class="main">
+      <nav class="stepper" aria-label="Alur pertandingan">
+        <a class="step" data-step="1" href="index.html">
+          <span>Langkah 1</span>
+          <strong>Init</strong>
+        </a>
+<a class="step" data-step="2" href="players.html">
+          <span>Langkah 2</span>
+          <strong>Peserta</strong>
+        </a>
+<a class="step" data-step="3" href="players.html">
+          <span>Langkah 3</span>
+          <strong>Submit</strong>
+        </a>
+<a class="step" data-step="4" href="matches.html">
+          <span>Langkah 4</span>
+          <strong>Pertandingan</strong>
+        </a>
+<a class="step" data-step="5" href="leaderboard.html">
+          <span>Langkah 5</span>
+          <strong>Leaderboard</strong>
+        </a>
+      </nav>
+
+      <div class="heading">
+        <div>
+          <div class="eyebrow">Langkah 1</div>
+          <h1>Init Pertandingan</h1>
+          <p>Tentukan identitas pertandingan, sistem skor, cara random, dan jumlah court sebelum memasukkan peserta.</p>
+        </div>
+      </div>
+
+
+<div class="grid grid-sidebar">
+  <div class="card">
+    <div class="card-header">
+      <h2>Informasi Pertandingan</h2>
+      <span class="badge">Langkah 1 dari 5</span>
+    </div>
+
+    <div class="card-body">
+      <div class="info hidden" id="lockedNotice" style="margin-bottom:15px">
+        <strong>Sesi sedang berjalan.</strong>
+        Sistem pertandingan dikunci agar jadwal dan leaderboard tetap konsisten.
+        Gunakan reset untuk membuat sesi baru.
+      </div>
+
+      <form id="setupForm">
+        <div class="field">
+          <label for="matchName">Nama pertandingan</label>
+          <input
+            class="input"
+            id="matchName"
+            maxlength="70"
+            placeholder="Contoh: Padel Jumat Malam">
+        </div>
+
+        <div style="margin-top:15px">
+          <div class="field">
+            <label>Jenis random</label>
+          </div>
+
+          <div class="mode-grid">
+            <label class="mode-option" data-mode-option>
+              <input type="radio" name="randomMode" value="player">
+              <strong>Per Player</strong>
+              <span>
+                Nama dimasukkan satu per satu. Pasangan dan lawan diacak ulang
+                setiap ronde agar lebih variatif.
+              </span>
+            </label>
+
+            <label class="mode-option" data-mode-option>
+              <input type="radio" name="randomMode" value="team">
+              <strong>Per Tim</strong>
+              <span>
+                Setiap tim terdiri dari dua pemain tetap. Sistem hanya mengacak
+                lawan dan giliran bermain.
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-grid" style="margin-top:15px">
+          <div class="field">
+            <label for="scoreSystem">Sistem skor</label>
+            <select class="select" id="scoreSystem">
+              <option value="fixed:21">Total 21 — skor lawan otomatis</option>
+              <option value="fixed:15">Total 15 — skor lawan otomatis</option>
+              <option value="fixed:11">Total 11 — skor lawan otomatis</option>
+              <option value="manual">Skor manual — isi kedua sisi</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="courtCount">Jumlah court</label>
+            <select class="select" id="courtCount">
+              <option value="1">1 court</option>
+              <option value="2">2 court</option>
+              <option value="3">3 court</option>
+              <option value="4">4 court</option>
+              <option value="5">5 court</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="minimumGames">Minimum game per peserta</label>
+            <input
+              class="input"
+              id="minimumGames"
+              type="number"
+              min="1"
+              max="20"
+              value="4">
+          </div>
+        </div>
+
+        <p class="hint">
+          Jumlah ronde tidak perlu ditentukan. Sistem menghitungnya otomatis
+          setelah roster disubmit agar jumlah game semerata mungkin.
+        </p>
+
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:17px">
+          <button class="btn btn-primary" type="submit" id="saveSetup">
+            Simpan &amp; Masukkan Peserta
+          </button>
+
+          <button class="btn btn-success hidden" type="button" id="resumeMatch">
+            Lanjutkan Pertandingan
+          </button>
+
+          <button class="btn btn-danger" type="button" id="resetSession">
+            Reset / Pertandingan Baru
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Alur PadelFlex</h2>
+    </div>
+
+    <div class="card-body">
+      <div class="list">
+        <div class="list-item">
+          <span class="avatar">1</span>
+          <div class="list-main">
+            <div class="list-title">Init pertandingan</div>
+            <div class="list-meta">Nama, skor, random, dan court.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">2</span>
+          <div class="list-main">
+            <div class="list-title">Masukkan roster</div>
+            <div class="list-meta">Pemain individual atau pasangan tetap.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">3</span>
+          <div class="list-main">
+            <div class="list-title">Submit pertandingan</div>
+            <div class="list-meta">Ronde dibuat otomatis dan merata.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">4</span>
+          <div class="list-main">
+            <div class="list-title">Main, skip, tambah peserta</div>
+            <div class="list-meta">Jadwal yang belum dimainkan disusun ulang.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">5</span>
+          <div class="list-main">
+            <div class="list-title">Export leaderboard</div>
+            <div class="list-meta">CSV, gambar, dan backup JSON.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="assets/js/storage.js" defer></script>
+  <script src="assets/js/scheduler.js" defer></script>
+  <script src="assets/js/core.js" defer></script>
+  <script src="assets/js/common.js" defer></script>
+  <script src="assets/js/pages/setup.js" defer></script>
+</body>
+</html>

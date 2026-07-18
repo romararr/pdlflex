@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#246bfd">
+  <title>Pertandingan — PadelFlex</title>
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-page="matches">
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="index.html">
+          <span class="brand-mark">PF</span>
+          <span>
+            <strong id="headerMatchName">PadelFlex</strong>
+            <small id="headerMatchMeta">Matchmaker padel tanpa database</small>
+          </span>
+        </a>
+        <div class="storage">● <span>Tersimpan otomatis di browser</span></div>
+      </div>
+    </header>
+
+    <main class="main">
+      <nav class="stepper" aria-label="Alur pertandingan">
+        <a class="step" data-step="1" href="index.html">
+          <span>Langkah 1</span>
+          <strong>Init</strong>
+        </a>
+<a class="step" data-step="2" href="players.html">
+          <span>Langkah 2</span>
+          <strong>Peserta</strong>
+        </a>
+<a class="step" data-step="3" href="players.html">
+          <span>Langkah 3</span>
+          <strong>Submit</strong>
+        </a>
+<a class="step" data-step="4" href="matches.html">
+          <span>Langkah 4</span>
+          <strong>Pertandingan</strong>
+        </a>
+<a class="step" data-step="5" href="leaderboard.html">
+          <span>Langkah 5</span>
+          <strong>Leaderboard</strong>
+        </a>
+      </nav>
+
+      <div class="heading">
+        <div>
+          <div class="eyebrow">Langkah 4</div>
+          <h1>Pertandingan</h1>
+          <p>Input skor, tunda pertandingan yang belum ready, atau tambahkan peserta baru tanpa mengubah match yang sudah memiliki skor.</p>
+        </div>
+      </div>
+
+
+<div class="summary-grid" id="matchSummary"></div>
+
+<div class="info" style="margin:18px 0">
+  <strong>Tambah peserta di tengah pertandingan:</strong>
+  buka halaman Peserta. Match yang sudah memiliki skor dan ronde aktif tetap
+  dipertahankan, sedangkan jadwal berikutnya disusun ulang agar kembali merata.
+</div>
+
+<section class="card hidden" id="deferredSection" style="margin-bottom:18px">
+  <div class="card-header">
+    <div>
+      <h2>Antrean Match Tertunda</h2>
+      <div class="list-meta">
+        Match yang di-skip tetap tersimpan dan dapat dimainkan kembali kapan saja.
+      </div>
+    </div>
+    <span class="badge badge-warning" id="deferredCount">0 match</span>
+  </div>
+  <div class="card-body">
+    <div class="list" id="deferredQueue"></div>
+  </div>
+</section>
+
+<div id="roundsContainer"></div>
+
+<div class="sticky-actions" id="stickyActions">
+  <div class="sticky-copy">
+    <strong id="stickyTitle">Pertandingan aktif</strong>
+    <small id="stickySubtitle">Kontrol pertandingan selalu tersedia di sini.</small>
+  </div>
+
+  <div class="sticky-buttons">
+    <button class="btn btn-secondary btn-sm" id="addMidPlayer">
+      ＋ Tambah Peserta
+    </button>
+
+    <button class="btn btn-soft btn-sm" id="viewActive">
+      Lihat Ronde Aktif
+    </button>
+
+    <button class="btn btn-warning btn-sm hidden" id="playDeferred">
+      Mainkan Match Tertunda
+    </button>
+
+    <button class="btn btn-success btn-sm hidden" id="nextRound">
+      Mulai Ronde Berikutnya
+    </button>
+
+    <a class="btn btn-primary btn-sm" href="leaderboard.html">
+      Leaderboard
+    </a>
+  </div>
+</div>
+
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="assets/js/storage.js" defer></script>
+  <script src="assets/js/scheduler.js" defer></script>
+  <script src="assets/js/core.js" defer></script>
+  <script src="assets/js/common.js" defer></script>
+  <script src="assets/js/pages/matches.js" defer></script>
+</body>
+</html>
