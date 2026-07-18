@@ -141,16 +141,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
         <div class="hint">${scoreHelp()}</div>
 
-        ${round.status === "active" && !match.completed ? `
-          <div class="match-actions">
-            <button
-              class="btn btn-warning btn-sm"
-              data-action="skip"
-              data-round="${round.id}"
-              data-match="${match.id}">
-              Tunda / Skip Match
-            </button>
-          </div>` : ""}
+        // ${round.status === "active" && !match.completed ? `
+        //   <div class="match-actions">
+        //     <button
+        //       class="btn btn-warning btn-sm"
+        //       data-action="skip"
+        //       data-round="${round.id}"
+        //       data-match="${match.id}">
+        //       Tunda / Skip Match
+        //     </button>
+        //   </div>` : ""}
       </div>`;
   }
 
