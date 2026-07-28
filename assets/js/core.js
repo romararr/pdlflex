@@ -1,95 +1,251 @@
 (function () {
   "use strict";
 
-  let state = PFStorage.load();
-
-  function refresh() {
-    state = PFStorage.load();
-    return state;
-  }
+  let root = PFStorage.load();
 
   function persist() {
-    state = PFStorage.save(state);
+    root = PFStorage.save(root);
+
     window.dispatchEvent(
-      new CustomEvent("padelflex:state", { detail: state })
+      new CustomEvent("padelflex:state", { detail: root })
     );
-    return state;
+
+    return root;
   }
 
-  function getState() {
-    return state;
+  function refresh() {
+    root = PFStorage.load();
+    return root;
   }
 
-  function getEntities() {
-    return PFScheduler.getEntities(state);
+  function getRoot() {
+    return root;
   }
 
-  function getEntity(id) {
-    return getEntities().find(entity => entity.id === id) ||
-      state.players.find(player => player.id === id) ||
-      state.teams.find(team => team.id === id) ||
-      null;
-  }
+  function getSessions(options = {}) {
+    const includeArchived = Boolean(options.includeArchived);
 
-  function entityName(id) {
-    return getEntity(id)?.name || "Peserta";
-  }
-
-  function entityDetails(id) {
-    if (state.setup.randomMode !== "team") return "";
-
-    const team = state.teams.find(item => item.id === id);
-    if (!team) return "";
-
-    return `${team.player1} & ${team.player2}`;
-  }
-
-  function getRound(id) {
-    return state.rounds.find(round => round.id === id) || null;
-  }
-
-  function getActiveRound() {
-    return getRound(state.activeRoundId);
-  }
-
-  function getDeferredRounds() {
-    return state.rounds
-      .filter(round =>
-        round.deferred &&
-        round.status !== "completed" &&
-        round.matches.some(match => !match.completed)
+    return [...root.sessions]
+      .filter(session =>
+        includeArchived ||
+        session.status !== "archived"
       )
       .sort((a, b) =>
-        new Date(a.createdAt || 0).getTime() -
-        new Date(b.createdAt || 0).getTime() ||
+        new Date(b.updatedAt || 0).getTime() -
+        new Date(a.updatedAt || 0).getTime()
+      );
+  }
+
+  function getSession(id) {
+    return root.sessions.find(session => session.id === id) || null;
+  }
+
+  function getSelectedSession() {
+    return getSession(root.selectedSessionId);
+  }
+
+  function requireSession() {
+    const session = getSelectedSession();
+
+    if (!session) {
+      throw new Error("Belum ada turnamen yang dipilih.");
+    }
+
+    return session;
+  }
+
+  function touch(session) {
+    session.updatedAt = new Date().toISOString();
+  }
+
+  function createDraft(initial = {}) {
+    const session = PFStorage.defaultSession();
+
+    session.setup = {
+      ...session.setup,
+      ...initial,
+      initialized: false
+    };
+
+    root.sessions.push(session);
+    root.selectedSessionId = session.id;
+    persist();
+
+    return session;
+  }
+
+  function selectSession(id) {
+    const session = getSession(id);
+
+    if (!session) {
+      throw new Error("Turnamen tidak ditemukan.");
+    }
+
+    root.selectedSessionId = session.id;
+    persist();
+
+    return session;
+  }
+
+  function duplicateSession(id) {
+    const source = getSession(id);
+
+    if (!source) {
+      throw new Error("Turnamen tidak ditemukan.");
+    }
+
+    const copy = PFStorage.normalizeSession({
+      ...JSON.parse(JSON.stringify(source)),
+      id: PFStorage.uid("session"),
+      status: "draft",
+      submitted: false,
+      setup: {
+        ...source.setup,
+        initialized: true,
+        matchName: `${source.setup.matchName} - Copy`
+      },
+      rounds: [],
+      activeRoundId: null,
+      scoreHistory: [],
+      completedAt: null,
+      archivedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+
+    copy.players = copy.players.map(player => ({
+      ...player,
+      id: PFStorage.uid("player"),
+      joinedAtRound: 1
+    }));
+
+    if (source.setup.randomMode === "team") {
+      copy.teams = source.teams.map(team => ({
+        ...team,
+        id: PFStorage.uid("team"),
+        joinedAtRound: 1
+      }));
+    }
+
+    root.sessions.push(copy);
+    root.selectedSessionId = copy.id;
+    persist();
+
+    return copy;
+  }
+
+  function archiveSession(id) {
+    const session = getSession(id);
+
+    if (!session) {
+      throw new Error("Turnamen tidak ditemukan.");
+    }
+
+    session.status = "archived";
+    session.archivedAt = new Date().toISOString();
+    touch(session);
+
+    if (root.selectedSessionId === id) {
+      root.selectedSessionId =
+        getSessions().find(item => item.id !== id)?.id || null;
+    }
+
+    persist();
+  }
+
+  function restoreSession(id) {
+    const session = getSession(id);
+
+    if (!session) {
+      throw new Error("Turnamen tidak ditemukan.");
+    }
+
+    session.status = session.submitted ? "active" : "draft";
+    session.archivedAt = null;
+    touch(session);
+    persist();
+
+    return session;
+  }
+
+  function deleteSession(id) {
+    const session = getSession(id);
+
+    if (!session) {
+      throw new Error("Turnamen tidak ditemukan.");
+    }
+
+    root.sessions = root.sessions.filter(item => item.id !== id);
+
+    if (root.selectedSessionId === id) {
+      root.selectedSessionId = root.sessions[0]?.id || null;
+    }
+
+    persist();
+  }
+
+  function getEntities(session = requireSession()) {
+    return PFScheduler.getEntities(session);
+  }
+
+  function getAllEntities(session = requireSession()) {
+    return session.setup.randomMode === "team"
+      ? session.teams
+      : session.players;
+  }
+
+  function getEntity(id, session = requireSession()) {
+    return getAllEntities(session)
+      .find(entity => entity.id === id) || null;
+  }
+
+  function entityName(id, session = requireSession()) {
+    return getEntity(id, session)?.name || "Peserta";
+  }
+
+  function entityDetails(id, session = requireSession()) {
+    if (session.setup.randomMode !== "team") return "";
+
+    const team = session.teams.find(item => item.id === id);
+
+    return team
+      ? `${team.player1} & ${team.player2}`
+      : "";
+  }
+
+  function getRound(id, session = requireSession()) {
+    return session.rounds.find(round => round.id === id) || null;
+  }
+
+  function getActiveRound(session = requireSession()) {
+    return getRound(session.activeRoundId, session);
+  }
+
+  function getPendingRounds(session = requireSession()) {
+    return session.rounds
+      .filter(round => round.status !== "completed")
+      .sort((a, b) =>
+        Number(b.status === "active") -
+        Number(a.status === "active") ||
         a.number - b.number
       );
   }
 
-  function getNextRound(excludedId = null) {
-    const scheduled = state.rounds.filter(round =>
-      round.status === "scheduled" &&
-      round.id !== excludedId
-    );
-
-    return scheduled
-      .sort((a, b) =>
-        Number(a.deferred) - Number(b.deferred) ||
-        a.number - b.number
-      )[0] || null;
-  }
-
-  function getLastRoundNumber() {
-    return state.rounds.reduce(
-      (maximum, round) => Math.max(maximum, round.number),
-      0
-    );
+  function getNextRound(excludedId = null, session = requireSession()) {
+    return session.rounds
+      .filter(round =>
+        round.status === "scheduled" &&
+        round.id !== excludedId
+      )
+      .sort((a, b) => a.number - b.number)[0] || null;
   }
 
   function saveSetup(values) {
-    if (state.submitted) {
+    const session = requireSession();
+
+    if (session.submitted) {
       throw new Error(
-        "Pertandingan sudah disubmit. Reset sesi untuk mengubah sistem pertandingan."
+        "Turnamen sudah berjalan. Duplikasi atau buat turnamen baru untuk mengubah sistem."
       );
     }
 
@@ -99,298 +255,99 @@
       throw new Error("Nama pertandingan belum diisi.");
     }
 
-    const randomMode =
-      values.randomMode === "team" ? "team" : "player";
-    const scoreMode =
-      values.scoreMode === "manual" ? "manual" : "fixed";
-
-    state.setup = {
-      ...state.setup,
+    session.setup = {
+      ...session.setup,
       initialized: true,
       matchName,
-      randomMode,
-      scoreMode,
-      pointsTotal: Math.max(1, Number(values.pointsTotal || 21)),
-      courtCount: Math.max(1, Number(values.courtCount || 1)),
-      minimumGames: Math.max(1, Number(values.minimumGames || 4))
+      randomMode:
+        values.randomMode === "team"
+          ? "team"
+          : "player",
+      scoreMode:
+        values.scoreMode === "manual"
+          ? "manual"
+          : "fixed",
+      pointsTotal: Math.max(
+        1,
+        Number(values.pointsTotal || 21)
+      ),
+      courtCount: Math.max(
+        1,
+        Number(values.courtCount || 1)
+      ),
+      minimumGames: Math.max(
+        1,
+        Number(values.minimumGames || 4)
+      )
     };
 
-    if (randomMode === "team") {
-      state.players = [];
+    if (session.setup.randomMode === "team") {
+      session.players = [];
     } else {
-      state.teams = [];
+      session.teams = [];
     }
 
+    touch(session);
     persist();
-    return state.setup;
+
+    return session.setup;
   }
 
-  function validateRoster() {
-    if (!state.setup.initialized) {
-      throw new Error("Selesaikan inisialisasi pertandingan terlebih dahulu.");
-    }
-
-    const entities = getEntities();
-    const minimum =
-      state.setup.randomMode === "team" ? 2 : 4;
-
-    if (entities.length < minimum) {
-      throw new Error(
-        state.setup.randomMode === "team"
-          ? "Minimal masukkan 2 tim."
-          : "Minimal masukkan 4 pemain."
-      );
-    }
-
-    return entities;
-  }
-
-  function nextJoinedRound() {
-    const active = getActiveRound();
+  function nextJoinedRound(session) {
+    const active = getActiveRound(session);
 
     if (active) return active.number + 1;
-    return getLastRoundNumber() + 1 || 1;
+
+    return session.rounds.reduce(
+      (maximum, round) => Math.max(maximum, round.number),
+      0
+    ) + 1;
   }
 
-  function addPlayer(name) {
-    if (state.setup.randomMode !== "player") {
-      throw new Error("Sesi ini menggunakan mode Per Tim.");
-    }
+  function rebuildPreservedRounds(session) {
+    const preserved = [];
 
-    const clean = String(name || "").trim();
+    session.rounds.forEach(round => {
+      if (round.status === "active") {
+        preserved.push(JSON.parse(JSON.stringify(round)));
+        return;
+      }
 
-    if (!clean) throw new Error("Nama pemain belum diisi.");
-
-    const duplicate = state.players.some(
-      player => player.name.toLowerCase() === clean.toLowerCase()
-    );
-
-    if (duplicate) throw new Error("Nama pemain sudah terdaftar.");
-
-    state.players.push({
-      id: PFStorage.uid("player"),
-      name: clean,
-      active: true,
-      joinedAtRound: state.submitted ? nextJoinedRound() : 1,
-      createdAt: new Date().toISOString()
-    });
-
-    const rebuilt = state.submitted
-      ? rebuildFutureSchedule()
-      : null;
-
-    persist();
-    return rebuilt;
-  }
-
-  function addTeam(teamName, player1, player2) {
-    if (state.setup.randomMode !== "team") {
-      throw new Error("Sesi ini menggunakan mode Per Player.");
-    }
-
-    const first = String(player1 || "").trim();
-    const second = String(player2 || "").trim();
-    const generatedName =
-      String(teamName || "").trim() ||
-      `${first} & ${second}`;
-
-    if (!first || !second) {
-      throw new Error("Nama kedua pemain dalam tim harus diisi.");
-    }
-
-    if (first.toLowerCase() === second.toLowerCase()) {
-      throw new Error("Nama pemain dalam satu tim tidak boleh sama.");
-    }
-
-    const duplicateName = state.teams.some(
-      team => team.name.toLowerCase() === generatedName.toLowerCase()
-    );
-
-    if (duplicateName) {
-      throw new Error("Nama tim sudah terdaftar.");
-    }
-
-    const usedPlayer = state.teams.some(team =>
-      [team.player1, team.player2]
-        .some(name =>
-          name.toLowerCase() === first.toLowerCase() ||
-          name.toLowerCase() === second.toLowerCase()
-        )
-    );
-
-    if (usedPlayer) {
-      throw new Error("Salah satu pemain sudah terdaftar pada tim lain.");
-    }
-
-    state.teams.push({
-      id: PFStorage.uid("team"),
-      name: generatedName,
-      player1: first,
-      player2: second,
-      active: true,
-      joinedAtRound: state.submitted ? nextJoinedRound() : 1,
-      createdAt: new Date().toISOString()
-    });
-
-    const rebuilt = state.submitted
-      ? rebuildFutureSchedule()
-      : null;
-
-    persist();
-    return rebuilt;
-  }
-
-  function removeEntity(id) {
-    const entity = getEntity(id);
-
-    if (!entity) throw new Error("Peserta tidak ditemukan.");
-
-    const hasProtectedMatch = state.rounds.some(round =>
-      round.matches.some(match => {
-        const included =
-          PFScheduler.matchEntityIds(state, match).includes(id);
-
-        return included && (
-          match.completed ||
-          round.status === "active" ||
-          match.status === "deferred"
-        );
-      })
-    );
-
-    if (hasProtectedMatch) {
-      entity.active = false;
-
-      if (state.submitted) rebuildFutureSchedule();
-      persist();
-
-      return {
-        removed: false,
-        deactivated: true
-      };
-    }
-
-    if (state.setup.randomMode === "team") {
-      state.teams = state.teams.filter(team => team.id !== id);
-    } else {
-      state.players = state.players.filter(player => player.id !== id);
-    }
-
-    if (state.submitted) rebuildFutureSchedule();
-    persist();
-
-    return {
-      removed: true,
-      deactivated: false
-    };
-  }
-
-  function setEntityActive(id, active) {
-    const entity = getEntity(id);
-
-    if (!entity) throw new Error("Peserta tidak ditemukan.");
-
-    entity.active = Boolean(active);
-
-    const rebuilt = state.submitted
-      ? rebuildFutureSchedule()
-      : null;
-
-    persist();
-    return rebuilt;
-  }
-
-  function preservedRoundsForRebuild() {
-    const result = [];
-
-    state.rounds.forEach(round => {
-      const protectedMatches = round.matches.filter(match =>
-        match.completed ||
-        round.status === "active" ||
-        match.status === "deferred"
+      const completedMatches = round.matches.filter(
+        match => match.completed
       );
 
-      if (!protectedMatches.length) return;
+      if (!completedMatches.length) return;
 
-      result.push({
-        ...round,
-        matches: protectedMatches
+      preserved.push({
+        ...JSON.parse(JSON.stringify(round)),
+        status: "completed",
+        matches: completedMatches
       });
     });
 
-    return result.sort((a, b) => a.number - b.number);
+    return preserved.sort((a, b) => a.number - b.number);
   }
 
-  function getRecommendation(preservedRounds = null) {
-    const preserved =
-      preservedRounds === null
-        ? preservedRoundsForRebuild()
-        : preservedRounds;
-
+  function getRecommendation(
+    session = requireSession(),
+    preserved = null
+  ) {
     return PFScheduler.recommend(
-      state,
-      preserved,
+      session,
+      preserved === null
+        ? rebuildPreservedRounds(session)
+        : preserved,
       {
-        minimumGames: state.setup.minimumGames,
-        maxRounds: 80
+        minimumGames: session.setup.minimumGames,
+        maxRounds: 100
       }
     );
   }
 
-  function applyActiveStatus(round) {
-    round.status = "active";
-    round.deferred = false;
-
-    round.matches.forEach(match => {
-      if (!match.completed) {
-        match.status = "active";
-      }
-    });
-
-    state.activeRoundId = round.id;
-  }
-
-  function submitTournament() {
-    validateRoster();
-
-    const recommendation = PFScheduler.recommend(
-      state,
-      [],
-      {
-        minimumGames: state.setup.minimumGames,
-        maxRounds: 80
-      }
-    );
-
-    if (!recommendation.available) {
-      throw new Error(recommendation.reason);
-    }
-
-    const generated = PFScheduler.buildRounds(
-      state,
-      recommendation.rounds,
-      1,
-      []
-    );
-
-    if (!generated.length) {
-      throw new Error("Jadwal pertandingan gagal dibuat.");
-    }
-
-    state.rounds = generated;
-    state.submitted = true;
-    applyActiveStatus(state.rounds[0]);
-    persist();
-
-    return {
-      recommendation,
-      generated: generated.length
-    };
-  }
-
-  function rebuildFutureSchedule() {
-    const preserved = preservedRoundsForRebuild();
-    const recommendation = getRecommendation(preserved);
+  function rebuildFutureSchedule(session = requireSession()) {
+    const preserved = rebuildPreservedRounds(session);
+    const recommendation = getRecommendation(session, preserved);
 
     if (!recommendation.available) {
       return {
@@ -401,29 +358,29 @@
 
     const startNumber =
       preserved.reduce(
-        (maximum, round) => Math.max(maximum, round.number),
+        (maximum, round) =>
+          Math.max(maximum, round.number),
         0
       ) + 1;
 
     const generated = PFScheduler.buildRounds(
-      state,
+      session,
       recommendation.rounds,
       startNumber,
       preserved
     );
 
-    state.rounds = [...preserved, ...generated]
+    session.rounds = [...preserved, ...generated]
       .sort((a, b) => a.number - b.number);
 
-    const active = getActiveRound();
+    if (!getActiveRound(session)) {
+      const next = generated[0] ||
+        session.rounds.find(round => round.status === "scheduled");
 
-    if (!active) {
-      const firstNormal =
-        generated[0] ||
-        state.rounds.find(round => round.status === "scheduled");
-
-      if (firstNormal) applyActiveStatus(firstNormal);
+      if (next) activateRoundInternal(session, next);
     }
+
+    touch(session);
 
     return {
       generated: generated.length,
@@ -431,191 +388,541 @@
     };
   }
 
-  function setScore(roundId, matchId, side, rawValue) {
-    const round = getRound(roundId);
+  function addPlayer(name) {
+    const session = requireSession();
+
+    if (session.setup.randomMode !== "player") {
+      throw new Error("Turnamen ini menggunakan mode Per Tim.");
+    }
+
+    const clean = String(name || "").trim();
+
+    if (!clean) {
+      throw new Error("Nama pemain belum diisi.");
+    }
+
+    if (
+      session.players.some(
+        player =>
+          player.name.toLowerCase() === clean.toLowerCase()
+      )
+    ) {
+      throw new Error("Nama pemain sudah terdaftar.");
+    }
+
+    session.players.push({
+      id: PFStorage.uid("player"),
+      name: clean,
+      active: true,
+      joinedAtRound:
+        session.submitted
+          ? nextJoinedRound(session)
+          : 1,
+      createdAt: new Date().toISOString()
+    });
+
+    const rebuilt =
+      session.submitted
+        ? rebuildFutureSchedule(session)
+        : null;
+
+    touch(session);
+    persist();
+
+    return rebuilt;
+  }
+
+  function addTeam(teamName, player1, player2) {
+    const session = requireSession();
+
+    if (session.setup.randomMode !== "team") {
+      throw new Error("Turnamen ini menggunakan mode Per Player.");
+    }
+
+    const first = String(player1 || "").trim();
+    const second = String(player2 || "").trim();
+
+    if (!first || !second) {
+      throw new Error("Nama kedua pemain harus diisi.");
+    }
+
+    if (first.toLowerCase() === second.toLowerCase()) {
+      throw new Error("Nama pemain dalam satu tim tidak boleh sama.");
+    }
+
+    const name =
+      String(teamName || "").trim() ||
+      `${first} & ${second}`;
+
+    if (
+      session.teams.some(
+        team =>
+          team.name.toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      throw new Error("Nama tim sudah terdaftar.");
+    }
+
+    const playerUsed = session.teams.some(team =>
+      [team.player1, team.player2].some(existing =>
+        [first, second].some(candidate =>
+          existing.toLowerCase() === candidate.toLowerCase()
+        )
+      )
+    );
+
+    if (playerUsed) {
+      throw new Error("Salah satu pemain sudah terdaftar di tim lain.");
+    }
+
+    session.teams.push({
+      id: PFStorage.uid("team"),
+      name,
+      player1: first,
+      player2: second,
+      active: true,
+      joinedAtRound:
+        session.submitted
+          ? nextJoinedRound(session)
+          : 1,
+      createdAt: new Date().toISOString()
+    });
+
+    const rebuilt =
+      session.submitted
+        ? rebuildFutureSchedule(session)
+        : null;
+
+    touch(session);
+    persist();
+
+    return rebuilt;
+  }
+
+  function setEntityActive(id, active) {
+    const session = requireSession();
+    const entity = getEntity(id, session);
+
+    if (!entity) {
+      throw new Error("Peserta tidak ditemukan.");
+    }
+
+    entity.active = Boolean(active);
+
+    const rebuilt =
+      session.submitted
+        ? rebuildFutureSchedule(session)
+        : null;
+
+    touch(session);
+    persist();
+
+    return rebuilt;
+  }
+
+  function removeEntity(id) {
+    const session = requireSession();
+    const entity = getEntity(id, session);
+
+    if (!entity) {
+      throw new Error("Peserta tidak ditemukan.");
+    }
+
+    const protectedReference = session.rounds.some(round =>
+      round.matches.some(match =>
+        PFScheduler
+          .matchEntityIds(session, match)
+          .includes(id) &&
+        (
+          match.completed ||
+          round.status === "active"
+        )
+      )
+    );
+
+    if (protectedReference) {
+      entity.active = false;
+
+      if (session.submitted) {
+        rebuildFutureSchedule(session);
+      }
+
+      touch(session);
+      persist();
+
+      return {
+        removed: false,
+        deactivated: true
+      };
+    }
+
+    if (session.setup.randomMode === "team") {
+      session.teams = session.teams.filter(team => team.id !== id);
+    } else {
+      session.players = session.players.filter(player => player.id !== id);
+    }
+
+    if (session.submitted) {
+      rebuildFutureSchedule(session);
+    }
+
+    touch(session);
+    persist();
+
+    return {
+      removed: true,
+      deactivated: false
+    };
+  }
+
+  function validateRoster(session = requireSession()) {
+    if (!session.setup.initialized) {
+      throw new Error("Selesaikan inisialisasi pertandingan.");
+    }
+
+    const minimum =
+      session.setup.randomMode === "team"
+        ? 2
+        : 4;
+
+    if (getEntities(session).length < minimum) {
+      throw new Error(
+        session.setup.randomMode === "team"
+          ? "Minimal 2 tim aktif."
+          : "Minimal 4 pemain aktif."
+      );
+    }
+  }
+
+  function activateRoundInternal(session, target) {
+    const active = getActiveRound(session);
+
+    if (active && active.id !== target.id) {
+      const completed =
+        active.matches.length > 0 &&
+        active.matches.every(match => match.completed);
+
+      active.status = completed
+        ? "completed"
+        : "scheduled";
+
+      active.matches.forEach(match => {
+        if (!match.completed) {
+          match.status = "scheduled";
+        }
+      });
+    }
+
+    target.status = "active";
+
+    target.matches.forEach(match => {
+      if (!match.completed) {
+        match.status = "active";
+      }
+    });
+
+    session.activeRoundId = target.id;
+  }
+
+  function submitTournament() {
+    const session = requireSession();
+
+    validateRoster(session);
+
+    const recommendation = getRecommendation(session, []);
+
+    if (!recommendation.available) {
+      throw new Error(recommendation.reason);
+    }
+
+    const generated = PFScheduler.buildRounds(
+      session,
+      recommendation.rounds,
+      1,
+      []
+    );
+
+    if (!generated.length) {
+      throw new Error("Jadwal pertandingan gagal dibuat.");
+    }
+
+    session.rounds = generated;
+    session.submitted = true;
+    session.status = "active";
+    session.completedAt = null;
+    activateRoundInternal(session, generated[0]);
+    touch(session);
+    persist();
+
+    return {
+      generated: generated.length,
+      recommendation
+    };
+  }
+
+  function activateRound(roundId) {
+    const session = requireSession();
+    const target = getRound(roundId, session);
+
+    if (!target) {
+      throw new Error("Ronde tidak ditemukan.");
+    }
+
+    if (target.status === "completed") {
+      throw new Error("Ronde ini sudah selesai.");
+    }
+
+    activateRoundInternal(session, target);
+    touch(session);
+    persist();
+
+    return target;
+  }
+
+  function pushScoreHistory(
+    session,
+    round,
+    match
+  ) {
+    session.scoreHistory.push({
+      id: PFStorage.uid("score_history"),
+      roundId: round.id,
+      matchId: match.id,
+      before: {
+        scoreA: match.scoreA,
+        scoreB: match.scoreB,
+        completed: match.completed,
+        matchStatus: match.status,
+        roundStatus: round.status,
+        activeRoundId: session.activeRoundId
+      },
+      createdAt: new Date().toISOString()
+    });
+
+    session.scoreHistory = session.scoreHistory.slice(-50);
+  }
+
+  function setScore(
+    roundId,
+    matchId,
+    side,
+    rawValue
+  ) {
+    const session = requireSession();
+    const round = getRound(roundId, session);
     const match = round?.matches.find(item => item.id === matchId);
 
     if (!round || !match) {
       throw new Error("Pertandingan tidak ditemukan.");
     }
 
-    const valueText = String(rawValue ?? "").trim();
+    const text = String(rawValue ?? "").trim();
 
-    if (valueText === "") {
+    pushScoreHistory(session, round, match);
+
+    if (text === "") {
       if (side === "A") match.scoreA = "";
       else match.scoreB = "";
 
       match.completed = false;
-      match.status = round.status === "active" ? "active" : "scheduled";
-      persist();
-      return match;
-    }
-
-    const value = Number(valueText);
-
-    if (!Number.isFinite(value) || value < 0) {
-      throw new Error("Skor tidak valid.");
-    }
-
-    if (state.setup.scoreMode === "fixed") {
-      const total = Number(state.setup.pointsTotal);
-
-      if (value > total) {
-        throw new Error(`Skor maksimal ${total}.`);
-      }
-
-      if (side === "A") {
-        match.scoreA = value;
-        match.scoreB = total - value;
-      } else {
-        match.scoreB = value;
-        match.scoreA = total - value;
-      }
-
-      match.completed = true;
+      match.status =
+        round.status === "active"
+          ? "active"
+          : "scheduled";
     } else {
-      if (side === "A") match.scoreA = value;
-      else match.scoreB = value;
+      const value = Number(text);
 
-      match.completed =
-        match.scoreA !== "" &&
-        match.scoreB !== "";
+      if (!Number.isFinite(value) || value < 0) {
+        session.scoreHistory.pop();
+        throw new Error("Skor tidak valid.");
+      }
+
+      if (session.setup.scoreMode === "fixed") {
+        const total = Number(session.setup.pointsTotal);
+
+        if (value > total) {
+          session.scoreHistory.pop();
+          throw new Error(`Skor maksimal ${total}.`);
+        }
+
+        if (side === "A") {
+          match.scoreA = value;
+          match.scoreB = total - value;
+        } else {
+          match.scoreB = value;
+          match.scoreA = total - value;
+        }
+
+        match.completed = true;
+      } else {
+        if (side === "A") match.scoreA = value;
+        else match.scoreB = value;
+
+        match.completed =
+          match.scoreA !== "" &&
+          match.scoreB !== "";
+      }
+
+      match.status = match.completed
+        ? "completed"
+        : "active";
     }
-
-    match.status = match.completed
-      ? "completed"
-      : (round.status === "active" ? "active" : "scheduled");
 
     if (
       round.matches.length &&
       round.matches.every(item => item.completed)
     ) {
       round.status = "completed";
+    } else if (round.id === session.activeRoundId) {
+      round.status = "active";
     }
 
+    touch(session);
     persist();
+
     return match;
   }
 
-  function activateRound(roundId) {
-    const target = getRound(roundId);
+  function undoLastScore() {
+    const session = requireSession();
+    const history = session.scoreHistory.pop();
 
-    if (!target) throw new Error("Ronde tidak ditemukan.");
-    if (target.status === "completed") {
-      throw new Error("Ronde ini sudah selesai.");
+    if (!history) {
+      throw new Error("Belum ada perubahan skor yang bisa dibatalkan.");
     }
 
-    const active = getActiveRound();
+    const round = getRound(history.roundId, session);
+    const match = round?.matches.find(
+      item => item.id === history.matchId
+    );
 
-    if (active && active.id !== target.id) {
-      const complete =
-        active.matches.length &&
-        active.matches.every(match => match.completed);
-
-      active.status = complete ? "completed" : "scheduled";
-
-      active.matches.forEach(match => {
-        if (!match.completed) {
-          match.status =
-            match.status === "deferred"
-              ? "deferred"
-              : "scheduled";
-        }
-      });
+    if (!round || !match) {
+      throw new Error("Riwayat skor tidak lagi tersedia.");
     }
 
-    applyActiveStatus(target);
+    match.scoreA = history.before.scoreA;
+    match.scoreB = history.before.scoreB;
+    match.completed = history.before.completed;
+    match.status = history.before.matchStatus;
+    round.status = history.before.roundStatus;
+    session.activeRoundId = history.before.activeRoundId;
+
+    touch(session);
     persist();
 
-    return target;
+    return {
+      round,
+      match
+    };
   }
 
-  function skipMatch(roundId, matchId) {
-    const round = getRound(roundId);
+  function reopenMatch(roundId, matchId) {
+    const session = requireSession();
+    const round = getRound(roundId, session);
     const match = round?.matches.find(item => item.id === matchId);
 
     if (!round || !match) {
       throw new Error("Pertandingan tidak ditemukan.");
     }
 
-    if (match.completed) {
-      throw new Error("Pertandingan yang sudah selesai tidak dapat ditunda.");
-    }
-
-    round.matches = round.matches.filter(item => item.id !== match.id);
-
-    match.status = "deferred";
-    match.deferredCount = Number(match.deferredCount || 0) + 1;
-    match.deferredAt = new Date().toISOString();
-
-    const deferredRound = {
-      id: PFStorage.uid("round"),
-      number: getLastRoundNumber() + 1,
-      status: "scheduled",
-      deferred: true,
-      createdAt: new Date().toISOString(),
-      matches: [match],
-      resting: []
-    };
-
-    state.rounds.push(deferredRound);
-
-    if (!round.matches.length) {
-      round.status = "completed";
-
-      if (round.id === state.activeRoundId) {
-        state.activeRoundId = null;
-
-        const next = getNextRound(round.id);
-
-        if (next) applyActiveStatus(next);
-      }
-    } else if (
-      round.matches.every(item => item.completed)
-    ) {
-      round.status = "completed";
-    }
-
+    pushScoreHistory(session, round, match);
+    match.completed = false;
+    match.status = "active";
+    activateRoundInternal(session, round);
+    touch(session);
     persist();
 
-    return {
-      deferredRound,
-      activeRound: getActiveRound()
-    };
+    return match;
   }
 
   function startNextRound() {
-    const active = getActiveRound();
+    const session = requireSession();
+    const active = getActiveRound(session);
 
     if (
       active &&
       active.matches.some(match => !match.completed)
     ) {
       throw new Error(
-        "Selesaikan atau tunda semua pertandingan pada ronde aktif."
+        "Ronde aktif masih memiliki pertandingan tanpa skor."
       );
     }
 
     if (active) active.status = "completed";
 
-    const next = getNextRound(active?.id || null);
+    const next = getNextRound(active?.id || null, session);
 
     if (!next) {
-      state.activeRoundId = null;
+      session.activeRoundId = null;
+      touch(session);
       persist();
       return null;
     }
 
-    applyActiveStatus(next);
+    activateRoundInternal(session, next);
+    touch(session);
     persist();
+
     return next;
   }
 
-  function computeStats() {
+  function completeTournament(force = false) {
+    const session = requireSession();
+
+    const unfinished = session.rounds.reduce(
+      (total, round) =>
+        total +
+        round.matches.filter(match => !match.completed).length,
+      0
+    );
+
+    if (unfinished && !force) {
+      throw new Error(
+        `${unfinished} pertandingan belum memiliki skor.`
+      );
+    }
+
+    session.status = "completed";
+    session.completedAt = new Date().toISOString();
+    session.activeRoundId = null;
+
+    session.rounds.forEach(round => {
+      if (round.matches.every(match => match.completed)) {
+        round.status = "completed";
+      }
+    });
+
+    touch(session);
+    persist();
+
+    return session;
+  }
+
+  function reopenTournament() {
+    const session = requireSession();
+
+    session.status = "active";
+    session.completedAt = null;
+
+    const next = session.rounds.find(round =>
+      round.matches.some(match => !match.completed)
+    );
+
+    if (next) {
+      activateRoundInternal(session, next);
+    }
+
+    touch(session);
+    persist();
+
+    return session;
+  }
+
+  function computeStats(session = requireSession()) {
     const entities =
-      state.setup.randomMode === "team"
-        ? state.teams
-        : state.players;
+      session.setup.randomMode === "team"
+        ? session.teams
+        : session.players;
 
     const stats = {};
 
@@ -624,7 +931,7 @@
         id: entity.id,
         name: entity.name,
         details:
-          state.setup.randomMode === "team"
+          session.setup.randomMode === "team"
             ? `${entity.player1} & ${entity.player2}`
             : "",
         active: entity.active !== false,
@@ -637,11 +944,12 @@
         diff: 0,
         compensation: 0,
         points: 0,
+        winRate: 0,
         rank: null
       };
     });
 
-    state.rounds.forEach(round => {
+    session.rounds.forEach(round => {
       round.matches.forEach(match => {
         if (!match.completed) return;
 
@@ -678,17 +986,23 @@
 
     const values = Object.values(stats);
     const maxGames = values.reduce(
-      (maximum, item) => Math.max(maximum, item.played),
+      (maximum, item) =>
+        Math.max(maximum, item.played),
       0
     );
 
     const compensationPerMissed =
-      state.setup.scoreMode === "fixed"
-        ? Math.floor(Number(state.setup.pointsTotal) / 2)
+      session.setup.scoreMode === "fixed"
+        ? Math.floor(Number(session.setup.pointsTotal) / 2)
         : 0;
 
     values.forEach(item => {
       item.diff = item.scored - item.conceded;
+      item.winRate =
+        item.played > 0
+          ? item.wins / item.played
+          : 0;
+
       const missed = Math.max(0, maxGames - item.played);
 
       item.compensation =
@@ -697,12 +1011,12 @@
           : 0;
 
       item.points =
-        state.setup.scoreMode === "fixed"
+        session.setup.scoreMode === "fixed"
           ? item.scored + item.compensation
           : item.wins * 3 + item.ties;
     });
 
-    const sorted = values.sort((a, b) =>
+    const sorted = [...values].sort((a, b) =>
       Number(b.played > 0) - Number(a.played > 0) ||
       b.points - a.points ||
       b.diff - a.diff ||
@@ -739,51 +1053,92 @@
     };
   }
 
-  function replaceState(newState) {
-    state = PFStorage.save(newState);
+  function sessionSummary(session) {
+    const entities =
+      session.setup.randomMode === "team"
+        ? session.teams
+        : session.players;
+
+    const matches = session.rounds.flatMap(round => round.matches);
+    const completed = matches.filter(match => match.completed).length;
+
+    return {
+      id: session.id,
+      name: session.setup.matchName,
+      status: session.status,
+      entityCount: entities.length,
+      rounds: session.rounds.length,
+      matches: matches.length,
+      completedMatches: completed,
+      progress:
+        matches.length > 0
+          ? Math.round(completed / matches.length * 100)
+          : 0,
+      fairness: PFScheduler.fairness(session),
+      updatedAt: session.updatedAt
+    };
+  }
+
+  function replaceRoot(newRoot) {
+    root = PFStorage.save(newRoot);
 
     window.dispatchEvent(
-      new CustomEvent("padelflex:state", { detail: state })
+      new CustomEvent("padelflex:state", { detail: root })
     );
   }
 
-  function reset() {
-    state = PFStorage.reset();
+  function clearAll() {
+    root = PFStorage.clear();
 
     window.dispatchEvent(
-      new CustomEvent("padelflex:state", { detail: state })
+      new CustomEvent("padelflex:state", { detail: root })
     );
 
-    return state;
+    return root;
   }
 
   window.PFApp = {
-    refresh,
     persist,
-    getState,
+    refresh,
+    getRoot,
+    getSessions,
+    getSession,
+    getSelectedSession,
+    requireSession,
+    createDraft,
+    selectSession,
+    duplicateSession,
+    archiveSession,
+    restoreSession,
+    deleteSession,
     getEntities,
+    getAllEntities,
     getEntity,
     entityName,
     entityDetails,
     getRound,
     getActiveRound,
-    getDeferredRounds,
+    getPendingRounds,
     getNextRound,
     saveSetup,
     addPlayer,
     addTeam,
-    removeEntity,
     setEntityActive,
+    removeEntity,
     validateRoster,
     getRecommendation,
-    submitTournament,
     rebuildFutureSchedule,
-    setScore,
+    submitTournament,
     activateRound,
-    skipMatch,
+    setScore,
+    undoLastScore,
+    reopenMatch,
     startNextRound,
+    completeTournament,
+    reopenTournament,
     computeStats,
-    replaceState,
-    reset
+    sessionSummary,
+    replaceRoot,
+    clearAll
   };
 })();

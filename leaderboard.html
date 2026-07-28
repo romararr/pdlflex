@@ -2,162 +2,201 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <title>Leaderboard — PadelFlex</title>
+  <meta name="description" content="PadelFlex Pro v4 - padel tournament manager tanpa database">
+  <title>Leaderboard — PadelFlex Pro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
 <body data-page="leaderboard">
-  <div class="shell">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a class="brand" href="index.html">
-          <span class="brand-mark">PF</span>
-          <span>
-            <strong id="headerMatchName">PadelFlex</strong>
-            <small id="headerMatchMeta">Matchmaker padel tanpa database</small>
-          </span>
-        </a>
-        <div class="storage">● <span>Tersimpan otomatis di browser</span></div>
-      </div>
-    </header>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">PF</span>
+        <span>
+          <strong>PadelFlex Pro</strong>
+          <small>Version 4 · Local-first</small>
+        </span>
+      </a>
 
-    <main class="main">
-      <nav class="stepper" aria-label="Alur pertandingan">
-        <a class="step" data-step="1" href="index.html">
-          <span>Langkah 1</span>
-          <strong>Init</strong>
+      <nav class="nav"><a class="nav-link" data-nav="hub" href="index.html">
+          <span class="nav-icon">⌂</span>Turnamen
         </a>
-<a class="step" data-step="2" href="players.html">
-          <span>Langkah 2</span>
-          <strong>Peserta</strong>
+<a class="nav-link" data-nav="setup" href="setup.html">
+          <span class="nav-icon">⚙</span>Init
         </a>
-<a class="step" data-step="3" href="players.html">
-          <span>Langkah 3</span>
-          <strong>Submit</strong>
+<a class="nav-link" data-nav="players" href="players.html">
+          <span class="nav-icon">👥</span>Peserta
         </a>
-<a class="step" data-step="4" href="matches.html">
-          <span>Langkah 4</span>
-          <strong>Pertandingan</strong>
+<a class="nav-link" data-nav="matches" href="matches.html">
+          <span class="nav-icon">🎾</span>Pertandingan
         </a>
-<a class="step" data-step="5" href="leaderboard.html">
-          <span>Langkah 5</span>
-          <strong>Leaderboard</strong>
+<a class="nav-link" data-nav="leaderboard" href="leaderboard.html">
+          <span class="nav-icon">🏆</span>Leaderboard
         </a>
-      </nav>
+<a class="nav-link" data-nav="display" href="display.html">
+          <span class="nav-icon">▣</span>Display TV
+        </a>
+<a class="nav-link" data-nav="settings" href="settings.html">
+          <span class="nav-icon">☷</span>Settings
+        </a></nav>
 
-      <div class="heading leaderboard-page-heading">
-        <div>
-          <div class="eyebrow">Langkah 5</div>
-          <h1>Leaderboard</h1>
-          <p>Lihat hasil akhir dan export leaderboard ke CSV atau gambar.</p>
+      <div class="sidebar-footer">
+        <div class="local-note">
+          <strong style="display:block;color:#fff;margin-bottom:4px">
+            Tanpa database
+          </strong>
+          Multi-turnamen disimpan otomatis di browser dan dapat dibackup ke JSON.
         </div>
       </div>
+    </aside>
 
-<div class="mobile-tournament-summary">
-  <div class="mobile-tournament-title">
-    <span class="mobile-trophy">🏆</span>
-    <div>
-      <strong id="mobileMatchName">Pertandingan Padel</strong>
-      <small id="mobileMatchStatus">Tournament Leaderboard</small>
-    </div>
-  </div>
+    <section class="main-shell">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <strong id="topbarTitle">PadelFlex Pro</strong>
+          <span id="topbarSubtitle">Multi-turnamen · tanpa database</span>
+        </div>
 
-  <div class="mobile-tournament-meta">
-    <div>
-      <span>☷</span>
-      <strong id="mobileRandomMode">Americano</strong>
-    </div>
-    <div>
-      <span>◎</span>
-      <strong id="mobileScoreMode">21 Points</strong>
-    </div>
-    <div>
-      <span>👥</span>
-      <strong id="mobileParticipantMeta">0 Players · 1 Court</strong>
-    </div>
+        <div class="autosave">● <span>Tersimpan otomatis</span></div>
+      </header>
+
+      <main class="page">
+        <nav class="stepper" aria-label="Alur turnamen"><a class="step" data-step="1" href="setup.html">
+              <span>Langkah 1</span>
+              <strong>Init</strong>
+            </a><a class="step" data-step="2" href="players.html">
+              <span>Langkah 2</span>
+              <strong>Peserta</strong>
+            </a><a class="step" data-step="3" href="players.html">
+              <span>Langkah 3</span>
+              <strong>Submit</strong>
+            </a><a class="step" data-step="4" href="matches.html">
+              <span>Langkah 4</span>
+              <strong>Pertandingan</strong>
+            </a><a class="step" data-step="5" href="leaderboard.html">
+              <span>Langkah 5</span>
+              <strong>Leaderboard</strong>
+            </a></nav>
+
+        <div class="heading">
+          <div>
+            <div class="eyebrow">Langkah 5</div>
+            <h1>Leaderboard</h1>
+            <p>Ranking responsif, multi-sort, export, dan lifecycle final turnamen.</p>
+          </div>
+        </div>
+
+
+<div class="mobile-summary">
+  <h2 id="summaryMatchName">Turnamen Padel</h2>
+
+  <div class="mobile-summary-meta">
+    <div><span>MODE</span><strong id="summaryMode">Per Player</strong></div>
+    <div><span>SKOR</span><strong id="summaryScore">21 Points</strong></div>
+    <div><span>PESERTA</span><strong id="summaryParticipants">0 Players</strong></div>
+    <div><span>PROGRES</span><strong id="summaryProgress">0/0</strong></div>
   </div>
 </div>
 
-<div class="card leaderboard-card">
+<div class="grid grid-4" style="margin-bottom:18px">
+  <div class="stat">
+    <span>Turnamen</span>
+    <strong style="font-size:16px" id="summaryMatchNameDesktop">Aktif</strong>
+    <small id="summaryFairness">0% fairness</small>
+  </div>
+
+  <div class="stat">
+    <span>Mode</span>
+    <strong style="font-size:16px" id="summaryModeDesktop">Per Player</strong>
+    <small>jenis random</small>
+  </div>
+
+  <div class="stat">
+    <span>Sistem skor</span>
+    <strong style="font-size:16px" id="summaryScoreDesktop">21 Points</strong>
+    <small>per pertandingan</small>
+  </div>
+
+  <div class="stat">
+    <span>Progres</span>
+    <strong style="font-size:16px" id="summaryProgressDesktop">0/0</strong>
+    <small>match selesai</small>
+  </div>
+</div>
+
+<div class="card">
   <div class="card-header">
     <div>
-      <h2 id="leaderboardMode">Leaderboard</h2>
-      <div class="list-meta">Ranking diperbarui otomatis dari skor pertandingan.</div>
+      <h2>Leaderboard</h2>
+      <div class="list-meta">Ranking dapat diubah tanpa mengubah data skor.</div>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-secondary btn-sm" id="exportCsv">
-        Export CSV
-      </button>
+      <select class="select" id="rankingMode" style="width:auto;min-height:34px;padding:4px 9px">
+        <option value="points">By Points</option>
+        <option value="wins">By Wins</option>
+        <option value="diff">By Difference</option>
+        <option value="winrate">By Win Rate</option>
+      </select>
 
-      <button class="btn btn-primary btn-sm" id="exportPng">
-        Export Gambar
-      </button>
-
-      <button class="btn btn-soft btn-sm" id="exportBackup">
-        Backup JSON
-      </button>
+      <button class="btn btn-secondary btn-sm" id="exportCsv">CSV</button>
+      <button class="btn btn-primary btn-sm" id="exportPng">Gambar</button>
+      <button class="btn btn-soft btn-sm" id="exportJson">JSON</button>
     </div>
   </div>
 
   <div class="card-body">
-    <div class="desktop-leaderboard-table table-wrap">
+    <div class="desktop-table table-wrap">
       <table>
         <thead>
           <tr>
-            <th>#</th>
-            <th>Nama</th>
-            <th>G</th>
-            <th>W-L-T</th>
-            <th>Diff</th>
-            <th>+M</th>
-            <th>P</th>
+            <th>#</th><th>Nama</th><th>G</th><th>W-L-T</th>
+            <th>Diff</th><th>+M</th><th>P</th>
           </tr>
         </thead>
         <tbody id="leaderboardBody"></tbody>
       </table>
     </div>
 
-    <div class="mobile-leaderboard" id="mobileLeaderboard">
-      <div class="mobile-leaderboard-head">
-        <div class="mobile-sort-label">◉ &nbsp; BY POINTS</div>
-        <div>G</div>
-        <div>W-L-T</div>
-        <div>DIFF</div>
-        <div>+M</div>
-        <div>P</div>
+    <div class="mobile-leaderboard">
+      <div class="mobile-board">
+        <div class="mobile-board-head">
+          <div style="text-align:left">BY RANK</div>
+          <div>G</div><div>W-L-T</div><div>DIFF</div><div>+M</div><div>P</div>
+        </div>
+        <div id="mobileLeaderboardRows"></div>
       </div>
-      <div class="mobile-leaderboard-rows" id="mobileLeaderboardRows"></div>
     </div>
 
-    <div class="info leaderboard-formula" id="formula" style="margin-top:15px"></div>
+    <div class="info" id="formula" style="margin-top:14px"></div>
 
-    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+    <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:15px">
+      <button class="btn btn-success" id="lifecycleButton">
+        Tandai Turnamen Selesai
+      </button>
+
       <a class="btn btn-secondary" href="matches.html">
         Kembali ke Pertandingan
       </a>
 
-      <a class="btn btn-soft" href="players.html">
-        Kelola Peserta
+      <a class="btn btn-soft" href="display.html">
+        Buka Display TV
       </a>
     </div>
   </div>
 </div>
 
-    </main>
-  </div>
+<nav class="mobile-bottom-nav">
+  <a href="matches.html"><span>☷</span><strong>Rounds</strong></a>
+  <a class="active" href="leaderboard.html"><span>▥</span><strong>Leaderboard</strong></a>
+</nav>
 
-  <nav class="leaderboard-mobile-nav" aria-label="Navigasi pertandingan">
-    <a href="matches.html">
-      <span>☷</span>
-      <strong>Rounds</strong>
-    </a>
-    <a class="active" href="leaderboard.html">
-      <span>▥</span>
-      <strong>Leaderboard</strong>
-    </a>
-  </nav>
+      </main>
+    </section>
+  </div>
 
   <div class="toast" id="toast"></div>
 

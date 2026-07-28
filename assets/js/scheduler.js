@@ -5,33 +5,34 @@
     return [a, b].sort().join("|");
   }
 
-  function getEntities(state) {
-    return state.setup.randomMode === "team"
-      ? state.teams.filter(team => team.active !== false)
-      : state.players.filter(player => player.active !== false);
+  function getEntities(session) {
+    return session.setup.randomMode === "team"
+      ? session.teams.filter(team => team.active !== false)
+      : session.players.filter(player => player.active !== false);
   }
 
-  function entitiesPerCourt(state) {
-    return state.setup.randomMode === "team" ? 2 : 4;
+  function entitiesPerCourt(session) {
+    return session.setup.randomMode === "team" ? 2 : 4;
   }
 
-  function usableCourts(state) {
-    const entities = getEntities(state);
+  function usableCourts(session) {
+    const entities = getEntities(session);
+
     return Math.min(
-      Number(state.setup.courtCount),
-      Math.floor(entities.length / entitiesPerCourt(state))
+      Number(session.setup.courtCount),
+      Math.floor(
+        entities.length / entitiesPerCourt(session)
+      )
     );
   }
 
-  function matchEntityIds(state, match) {
-    if (state.setup.randomMode === "team") {
-      return [match.teamA[0], match.teamB[0]];
-    }
-
-    return [...match.teamA, ...match.teamB];
+  function matchEntityIds(session, match) {
+    return session.setup.randomMode === "team"
+      ? [match.teamA[0], match.teamB[0]]
+      : [...match.teamA, ...match.teamB];
   }
 
-  function createMetrics(state, rounds) {
+  function createMetrics(session, rounds) {
     const metrics = {
       playCount: new Map(),
       lastPlayed: new Map(),
@@ -43,14 +44,15 @@
       .sort((a, b) => a.number - b.number)
       .forEach(round => {
         round.matches.forEach(match => {
-          const all = matchEntityIds(state, match);
-
-          all.forEach(id => {
-            metrics.playCount.set(id, (metrics.playCount.get(id) || 0) + 1);
+          matchEntityIds(session, match).forEach(id => {
+            metrics.playCount.set(
+              id,
+              (metrics.playCount.get(id) || 0) + 1
+            );
             metrics.lastPlayed.set(id, round.number);
           });
 
-          if (state.setup.randomMode === "player") {
+          if (session.setup.randomMode === "player") {
             [
               [match.teamA[0], match.teamA[1]],
               [match.teamB[0], match.teamB[1]]
@@ -72,7 +74,11 @@
               });
             });
           } else {
-            const opponent = key(match.teamA[0], match.teamB[0]);
+            const opponent = key(
+              match.teamA[0],
+              match.teamB[0]
+            );
+
             metrics.opponentCount.set(
               opponent,
               (metrics.opponentCount.get(opponent) || 0) + 1
@@ -84,7 +90,7 @@
     return metrics;
   }
 
-  function selectEntities(entities, slotCount, metrics) {
+  function selectEntities(entities, slots, metrics) {
     return [...entities]
       .sort((a, b) => {
         const playDiff =
@@ -105,25 +111,26 @@
 
         if (joinedDiff !== 0) return joinedDiff;
 
-        return (a.name || "").localeCompare(b.name || "");
+        return String(a.name || "")
+          .localeCompare(String(b.name || ""));
       })
-      .slice(0, slotCount);
+      .slice(0, slots);
   }
 
   function combinationsOfFour(items) {
-    const result = [];
+    const groups = [];
 
     for (let a = 0; a < items.length - 3; a++) {
       for (let b = a + 1; b < items.length - 2; b++) {
         for (let c = b + 1; c < items.length - 1; c++) {
           for (let d = c + 1; d < items.length; d++) {
-            result.push([items[a], items[b], items[c], items[d]]);
+            groups.push([items[a], items[b], items[c], items[d]]);
           }
         }
       }
     }
 
-    return result;
+    return groups;
   }
 
   function pairingOptions(group) {
@@ -136,8 +143,8 @@
     ];
   }
 
-  function playerPairingPenalty(teamA, teamB, metrics) {
-    const pairPenalty =
+  function playerPenalty(teamA, teamB, metrics) {
+    const partnerPenalty =
       (metrics.pairCount.get(key(teamA[0], teamA[1])) || 0) * 100 +
       (metrics.pairCount.get(key(teamB[0], teamB[1])) || 0) * 100;
 
@@ -150,14 +157,19 @@
       });
     });
 
-    return pairPenalty + opponentPenalty;
+    return partnerPenalty + opponentPenalty;
   }
 
-  function registerPlayerMatch(match, roundNumber, metrics) {
-    const all = [...match.teamA, ...match.teamB];
-
-    all.forEach(id => {
-      metrics.playCount.set(id, (metrics.playCount.get(id) || 0) + 1);
+  function registerPlayerMatch(
+    match,
+    roundNumber,
+    metrics
+  ) {
+    [...match.teamA, ...match.teamB].forEach(id => {
+      metrics.playCount.set(
+        id,
+        (metrics.playCount.get(id) || 0) + 1
+      );
       metrics.lastPlayed.set(id, roundNumber);
     });
 
@@ -166,7 +178,10 @@
       [match.teamB[0], match.teamB[1]]
     ].forEach(([a, b]) => {
       const pair = key(a, b);
-      metrics.pairCount.set(pair, (metrics.pairCount.get(pair) || 0) + 1);
+      metrics.pairCount.set(
+        pair,
+        (metrics.pairCount.get(pair) || 0) + 1
+      );
     });
 
     match.teamA.forEach(a => {
@@ -180,7 +195,12 @@
     });
   }
 
-  function buildPlayerMatches(selected, courts, roundNumber, metrics) {
+  function buildPlayerMatches(
+    selected,
+    courts,
+    roundNumber,
+    metrics
+  ) {
     const remaining = selected.map(entity => entity.id);
     const matches = [];
 
@@ -191,7 +211,11 @@
 
       combinationsOfFour(remaining).forEach(group => {
         pairingOptions(group).forEach(([teamA, teamB]) => {
-          const penalty = playerPairingPenalty(teamA, teamB, metrics);
+          const penalty = playerPenalty(
+            teamA,
+            teamB,
+            metrics
+          );
 
           if (!best || penalty < best.penalty) {
             best = { group, teamA, teamB, penalty };
@@ -210,7 +234,7 @@
         scoreB: "",
         completed: false,
         status: "scheduled",
-        deferredCount: 0
+        createdAt: new Date().toISOString()
       };
 
       matches.push(match);
@@ -225,14 +249,19 @@
     return matches;
   }
 
-  function buildTeamMatches(selected, courts, roundNumber, metrics) {
+  function buildTeamMatches(
+    selected,
+    courts,
+    roundNumber,
+    metrics
+  ) {
     const remaining = selected.map(entity => entity.id);
     const matches = [];
 
     for (let court = 1; court <= courts; court++) {
       if (remaining.length < 2) break;
 
-      let bestPair = null;
+      let best = null;
 
       for (let a = 0; a < remaining.length - 1; a++) {
         for (let b = a + 1; b < remaining.length; b++) {
@@ -241,50 +270,58 @@
           const penalty =
             (metrics.opponentCount.get(key(teamA, teamB)) || 0) * 100;
 
-          if (!bestPair || penalty < bestPair.penalty) {
-            bestPair = { teamA, teamB, penalty };
+          if (!best || penalty < best.penalty) {
+            best = { teamA, teamB, penalty };
           }
         }
       }
 
-      if (!bestPair) break;
+      if (!best) break;
 
       const match = {
         id: PFStorage.uid("match"),
         court,
-        teamA: [bestPair.teamA],
-        teamB: [bestPair.teamB],
+        teamA: [best.teamA],
+        teamB: [best.teamB],
         scoreA: "",
         scoreB: "",
         completed: false,
         status: "scheduled",
-        deferredCount: 0
+        createdAt: new Date().toISOString()
       };
 
       matches.push(match);
 
-      [bestPair.teamA, bestPair.teamB].forEach(id => {
-        metrics.playCount.set(id, (metrics.playCount.get(id) || 0) + 1);
+      [best.teamA, best.teamB].forEach(id => {
+        metrics.playCount.set(
+          id,
+          (metrics.playCount.get(id) || 0) + 1
+        );
         metrics.lastPlayed.set(id, roundNumber);
       });
 
-      const opponent = key(bestPair.teamA, bestPair.teamB);
+      const opponent = key(best.teamA, best.teamB);
       metrics.opponentCount.set(
         opponent,
         (metrics.opponentCount.get(opponent) || 0) + 1
       );
 
-      remaining.splice(remaining.indexOf(bestPair.teamA), 1);
-      remaining.splice(remaining.indexOf(bestPair.teamB), 1);
+      remaining.splice(remaining.indexOf(best.teamA), 1);
+      remaining.splice(remaining.indexOf(best.teamB), 1);
     }
 
     return matches;
   }
 
-  function buildRounds(state, count, startNumber, preservedRounds) {
-    const entities = getEntities(state);
-    const courts = usableCourts(state);
-    const perCourt = entitiesPerCourt(state);
+  function buildRounds(
+    session,
+    count,
+    startNumber,
+    preservedRounds
+  ) {
+    const entities = getEntities(session);
+    const courts = usableCourts(session);
+    const perCourt = entitiesPerCourt(session);
 
     if (
       entities.length < perCourt ||
@@ -294,45 +331,63 @@
       return [];
     }
 
-    const metrics = createMetrics(state, preservedRounds);
-    const generated = [];
+    const metrics = createMetrics(session, preservedRounds);
+    const rounds = [];
 
     for (let offset = 0; offset < count; offset++) {
       const number = startNumber + offset;
-      const slots = courts * perCourt;
-      const selected = selectEntities(entities, slots, metrics);
-
-      const matches =
-        state.setup.randomMode === "team"
-          ? buildTeamMatches(selected, courts, number, metrics)
-          : buildPlayerMatches(selected, courts, number, metrics);
-
-      const playingIds = matches.flatMap(match =>
-        matchEntityIds(state, match)
+      const selected = selectEntities(
+        entities,
+        courts * perCourt,
+        metrics
       );
 
-      generated.push({
+      const matches =
+        session.setup.randomMode === "team"
+          ? buildTeamMatches(
+              selected,
+              courts,
+              number,
+              metrics
+            )
+          : buildPlayerMatches(
+              selected,
+              courts,
+              number,
+              metrics
+            );
+
+      const playing = matches.flatMap(match =>
+        matchEntityIds(session, match)
+      );
+
+      rounds.push({
         id: PFStorage.uid("round"),
         number,
         status: "scheduled",
-        deferred: false,
         createdAt: new Date().toISOString(),
         matches,
         resting: entities
-          .filter(entity => !playingIds.includes(entity.id))
+          .filter(entity => !playing.includes(entity.id))
           .map(entity => entity.id)
       });
     }
 
-    return generated;
+    return rounds;
   }
 
-  function countAppearances(state, entities, rounds) {
-    const counts = new Map(entities.map(entity => [entity.id, 0]));
+  function countAppearances(
+    session,
+    entities,
+    rounds
+  ) {
+    const counts = new Map(
+      entities.map(entity => [entity.id, 0])
+    );
 
     rounds.forEach(round => {
       round.matches.forEach(match => {
-        matchEntityIds(state, match).forEach(id => {
+        matchEntityIds(session, match).forEach(id => {
           if (counts.has(id)) {
             counts.set(id, counts.get(id) + 1);
           }
@@ -343,13 +398,20 @@
     return entities.map(entity => counts.get(entity.id) || 0);
   }
 
-  function targetFeasible(counts, rounds, slotsPerRound, exactOnly) {
+  function targetFeasible(
+    counts,
+    rounds,
+    slotsPerRound,
+    exactOnly
+  ) {
     const entityCount = counts.length;
-    const currentTotal = counts.reduce((sum, value) => sum + value, 0);
-    const finalTotal = currentTotal + rounds * slotsPerRound;
-    const low = Math.floor(finalTotal / entityCount);
-    const high = Math.ceil(finalTotal / entityCount);
-    const highCount = finalTotal % entityCount;
+    const total =
+      counts.reduce((sum, value) => sum + value, 0) +
+      rounds * slotsPerRound;
+
+    const low = Math.floor(total / entityCount);
+    const high = Math.ceil(total / entityCount);
+    const highCount = total % entityCount;
 
     if (exactOnly && highCount !== 0) return null;
 
@@ -357,17 +419,17 @@
     let forcedLow = 0;
 
     for (const current of counts) {
-      const canReachLow =
+      const canLow =
         current <= low &&
         low <= current + rounds;
 
-      const canReachHigh =
+      const canHigh =
         current <= high &&
         high <= current + rounds;
 
-      if (!canReachLow && !canReachHigh) return null;
-      if (!canReachLow && canReachHigh) forcedHigh++;
-      if (canReachLow && !canReachHigh) forcedLow++;
+      if (!canLow && !canHigh) return null;
+      if (!canLow && canHigh) forcedHigh++;
+      if (canLow && !canHigh) forcedLow++;
     }
 
     if (
@@ -384,53 +446,65 @@
     };
   }
 
-  function recommend(state, preservedRounds, options = {}) {
-    const entities = getEntities(state);
-    const courts = usableCourts(state);
-    const perCourt = entitiesPerCourt(state);
+  function recommend(
+    session,
+    preservedRounds,
+    options = {}
+  ) {
+    const entities = getEntities(session);
+    const courts = usableCourts(session);
+    const perCourt = entitiesPerCourt(session);
 
     if (entities.length < perCourt || courts < 1) {
       return {
         available: false,
         reason:
-          state.setup.randomMode === "team"
-            ? "Minimal 2 tim aktif untuk membuat pertandingan."
-            : "Minimal 4 pemain aktif untuk membuat pertandingan."
+          session.setup.randomMode === "team"
+            ? "Minimal 2 tim aktif."
+            : "Minimal 4 pemain aktif."
       };
     }
 
-    const slotsPerRound = courts * perCourt;
-    const counts = countAppearances(state, entities, preservedRounds);
-    const currentMax = Math.max(...counts, 0);
-    const minimumGames = Math.max(
-      1,
-      Number(options.minimumGames || state.setup.minimumGames || 4)
+    const slots = courts * perCourt;
+    const counts = countAppearances(
+      session,
+      entities,
+      preservedRounds
     );
-    const minimumTarget = Math.max(minimumGames, currentMax);
-    const maxRounds = Math.max(1, Number(options.maxRounds || 80));
 
-    let bestCompact = null;
+    const currentMaximum = Math.max(...counts, 0);
+    const minimumTarget = Math.max(
+      Number(options.minimumGames || session.setup.minimumGames || 4),
+      currentMaximum
+    );
+
+    const maxRounds = Math.max(
+      1,
+      Number(options.maxRounds || 80)
+    );
+
+    let compact = null;
 
     for (let rounds = 1; rounds <= maxRounds; rounds++) {
-      const compact = targetFeasible(
+      const candidate = targetFeasible(
         counts,
         rounds,
-        slotsPerRound,
+        slots,
         false
       );
 
       if (
-        compact &&
-        compact.low >= minimumTarget &&
-        !bestCompact
+        candidate &&
+        candidate.low >= minimumTarget &&
+        !compact
       ) {
-        bestCompact = { rounds, ...compact };
+        compact = { rounds, ...candidate };
       }
 
       const exact = targetFeasible(
         counts,
         rounds,
-        slotsPerRound,
+        slots,
         true
       );
 
@@ -443,22 +517,22 @@
           maxGames: exact.high,
           entityCount: entities.length,
           courts,
-          slotsPerRound,
+          slotsPerRound: slots,
           currentCounts: counts
         };
       }
     }
 
-    if (bestCompact) {
+    if (compact) {
       return {
         available: true,
-        rounds: bestCompact.rounds,
+        rounds: compact.rounds,
         exact: false,
-        minGames: bestCompact.low,
-        maxGames: bestCompact.high,
+        minGames: compact.low,
+        maxGames: compact.high,
         entityCount: entities.length,
         courts,
-        slotsPerRound,
+        slotsPerRound: slots,
         currentCounts: counts
       };
     }
@@ -470,12 +544,42 @@
     };
   }
 
+  function fairness(session) {
+    const entities = getEntities(session);
+    const counts = countAppearances(
+      session,
+      entities,
+      session.rounds
+    );
+
+    if (!counts.length) {
+      return {
+        score: 0,
+        min: 0,
+        max: 0,
+        difference: 0
+      };
+    }
+
+    const min = Math.min(...counts);
+    const max = Math.max(...counts);
+    const difference = max - min;
+
+    return {
+      min,
+      max,
+      difference,
+      score: Math.max(0, 100 - difference * 25)
+    };
+  }
+
   window.PFScheduler = {
     getEntities,
     entitiesPerCourt,
     usableCourts,
     matchEntityIds,
     buildRounds,
-    recommend
+    recommend,
+    fairness
   };
 })();

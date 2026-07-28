@@ -1,138 +1,255 @@
 document.addEventListener("DOMContentLoaded", function () {
-  const body = document.getElementById("leaderboardBody");
+  const desktopBody = document.getElementById("leaderboardBody");
   const mobileRows = document.getElementById("mobileLeaderboardRows");
+  const sortMode = document.getElementById("rankingMode");
   const formula = document.getElementById("formula");
+  const lifecycleButton = document.getElementById("lifecycleButton");
 
-  function calculation() {
-    return PFApp.computeStats();
+  function session() {
+    return PFApp.requireSession();
   }
 
-  function rankDisplay(item) {
-    if (!item.rank) return '<span class="mobile-rank-number">—</span>';
-    if (item.rank === 1) return '<span class="mobile-medal">🥇</span>';
-    if (item.rank === 2) return '<span class="mobile-medal">🥈</span>';
-    if (item.rank === 3) return '<span class="mobile-medal">🥉</span>';
+  function sortedRows() {
+    const result = PFApp.computeStats();
+    const mode = sortMode.value;
 
-    return `<span class="mobile-rank-number">${item.rank}</span>`;
+    const rows = [...result.sorted];
+
+    if (mode === "wins") {
+      rows.sort((a, b) =>
+        Number(b.played > 0) - Number(a.played > 0) ||
+        b.wins - a.wins ||
+        b.points - a.points ||
+        b.diff - a.diff ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    if (mode === "diff") {
+      rows.sort((a, b) =>
+        Number(b.played > 0) - Number(a.played > 0) ||
+        b.diff - a.diff ||
+        b.points - a.points ||
+        b.wins - a.wins ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    if (mode === "winrate") {
+      rows.sort((a, b) =>
+        Number(b.played > 0) - Number(a.played > 0) ||
+        b.winRate - a.winRate ||
+        b.played - a.played ||
+        b.points - a.points ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
+    let previous = null;
+    let currentRank = 0;
+
+    rows.forEach((item, index) => {
+      const metric =
+        mode === "wins" ? item.wins :
+        mode === "diff" ? item.diff :
+        mode === "winrate" ? item.winRate :
+        item.points;
+
+      const previousMetric =
+        previous
+          ? (
+              mode === "wins" ? previous.wins :
+              mode === "diff" ? previous.diff :
+              mode === "winrate" ? previous.winRate :
+              previous.points
+            )
+          : null;
+
+      if (
+        !previous ||
+        metric !== previousMetric ||
+        item.played === 0
+      ) {
+        currentRank = index + 1;
+      }
+
+      item.displayRank =
+        item.played > 0
+          ? currentRank
+          : null;
+
+      previous = item;
+    });
+
+    return {
+      ...result,
+      rows
+    };
   }
 
-  function renderMobileSummary(state) {
-    document.getElementById("mobileMatchName").textContent =
-      state.setup.matchName || "Pertandingan Padel";
+  function rankVisual(item) {
+    if (!item.displayRank) {
+      return '<span class="mobile-rank">—</span>';
+    }
 
-    document.getElementById("mobileRandomMode").textContent =
-      state.setup.randomMode === "team"
+    if (item.displayRank === 1) {
+      return '<span class="mobile-medal">🥇</span>';
+    }
+
+    if (item.displayRank === 2) {
+      return '<span class="mobile-medal">🥈</span>';
+    }
+
+    if (item.displayRank === 3) {
+      return '<span class="mobile-medal">🥉</span>';
+    }
+
+    return `<span class="mobile-rank">${item.displayRank}</span>`;
+  }
+
+  function renderSummary() {
+    const current = session();
+    const summary = PFApp.sessionSummary(current);
+
+    document.getElementById("summaryMatchName").textContent =
+      current.setup.matchName;
+
+    document.getElementById("summaryMode").textContent =
+      current.setup.randomMode === "team"
         ? "Per Tim"
         : "Americano · Per Player";
 
-    document.getElementById("mobileScoreMode").textContent =
-      state.setup.scoreMode === "fixed"
-        ? `${state.setup.pointsTotal} Points`
+    document.getElementById("summaryScore").textContent =
+      current.setup.scoreMode === "fixed"
+        ? `${current.setup.pointsTotal} Points`
         : "Manual Score";
 
-    const participantCount =
-      state.setup.randomMode === "team"
-        ? state.teams.filter(team => team.active !== false).length
-        : state.players.filter(player => player.active !== false).length;
+    document.getElementById("summaryParticipants").textContent =
+      `${summary.entityCount} ${
+        current.setup.randomMode === "team"
+          ? "Teams"
+          : "Players"
+      } · ${current.setup.courtCount} ${
+        Number(current.setup.courtCount) === 1
+          ? "Court"
+          : "Courts"
+      }`;
 
-    const participantLabel =
-      state.setup.randomMode === "team"
-        ? `${participantCount} Teams`
-        : `${participantCount} Players`;
+    document.getElementById("summaryProgress").textContent =
+      `${summary.completedMatches}/${summary.matches} match selesai`;
 
-    document.getElementById("mobileParticipantMeta").textContent =
-      `${participantLabel} · ${state.setup.courtCount} ` +
-      `${Number(state.setup.courtCount) === 1 ? "Court" : "Courts"}`;
+    document.getElementById("summaryFairness").textContent =
+      `${summary.fairness.score}% fairness`;
+
+    document.getElementById("summaryMatchNameDesktop").textContent =
+      current.setup.matchName;
+
+    document.getElementById("summaryModeDesktop").textContent =
+      current.setup.randomMode === "team"
+        ? "Per Tim"
+        : "Per Player";
+
+    document.getElementById("summaryScoreDesktop").textContent =
+      current.setup.scoreMode === "fixed"
+        ? `Total ${current.setup.pointsTotal}`
+        : "Manual";
+
+    document.getElementById("summaryProgressDesktop").textContent =
+      `${summary.completedMatches}/${summary.matches}`;
   }
 
   function render() {
-    const state = PFApp.getState();
-    const result = calculation();
+    const current = session();
+    const result = sortedRows();
 
-    document.getElementById("leaderboardMode").textContent =
-      state.setup.randomMode === "team"
-        ? "Leaderboard Tim"
-        : "Leaderboard Player";
+    renderSummary();
 
-    renderMobileSummary(state);
+    desktopBody.innerHTML = result.rows.map(item => `
+      <tr style="${item.played === 0 ? "opacity:.5" : ""}">
+        <td>
+          ${item.displayRank
+            ? `<span class="rank ${item.displayRank <= 3 ? "top" : ""}">
+                ${item.displayRank}
+               </span>`
+            : "—"}
+        </td>
 
-    if (!result.sorted.length) {
-      body.innerHTML =
-        '<tr><td colspan="7" style="text-align:center;color:var(--muted)">Belum ada peserta.</td></tr>';
+        <td>
+          <strong>${PFUI.escapeHtml(item.name)}</strong>
+          ${item.details
+            ? `<div class="list-meta">${PFUI.escapeHtml(item.details)}</div>`
+            : ""}
+        </td>
 
-      mobileRows.innerHTML = `
-        <div class="mobile-leaderboard-empty">
-          Belum ada peserta atau hasil pertandingan.
-        </div>`;
-    } else {
-      body.innerHTML = result.sorted.map(item => `
-        <tr style="${item.played === 0 ? "opacity:.5" : ""}">
-          <td>
-            ${item.rank
-              ? `<span class="rank ${item.rank <= 3 ? "top" : ""}">${item.rank}</span>`
-              : "—"}
-          </td>
-          <td>
+        <td>${item.played}</td>
+        <td>${item.wins}-${item.losses}-${item.ties}</td>
+        <td>${item.diff > 0 ? "+" : ""}${item.diff}</td>
+        <td>${item.compensation}</td>
+        <td><span class="points">${item.points}</span></td>
+      </tr>
+    `).join("");
+
+    mobileRows.innerHTML = result.rows.map(item => `
+      <div class="mobile-board-row" style="${item.played === 0 ? "opacity:.5" : ""}">
+        <div class="mobile-player">
+          ${rankVisual(item)}
+          <div style="min-width:0">
             <strong>${PFUI.escapeHtml(item.name)}</strong>
             ${item.details
-              ? `<div class="list-meta">${PFUI.escapeHtml(item.details)}</div>`
+              ? `<small>${PFUI.escapeHtml(item.details)}</small>`
               : ""}
-          </td>
-          <td>${item.played}</td>
-          <td>${item.wins}-${item.losses}-${item.ties}</td>
-          <td>${item.diff > 0 ? "+" : ""}${item.diff}</td>
-          <td>${item.compensation}</td>
-          <td><span class="points">${item.points}</span></td>
-        </tr>
-      `).join("");
-
-      mobileRows.innerHTML = result.sorted.map(item => `
-        <div class="mobile-leaderboard-row ${item.played === 0 ? "not-played" : ""}">
-          <div class="mobile-player-cell">
-            <div class="mobile-rank">${rankDisplay(item)}</div>
-            <div class="mobile-player-copy">
-              <strong>${PFUI.escapeHtml(item.name)}</strong>
-              ${item.details
-                ? `<small>${PFUI.escapeHtml(item.details)}</small>`
-                : ""}
-            </div>
           </div>
-
-          <div class="mobile-stat">${item.played}</div>
-          <div class="mobile-stat mobile-wlt">${item.wins}-${item.losses}-${item.ties}</div>
-          <div class="mobile-stat">${item.diff > 0 ? "+" : ""}${item.diff}</div>
-          <div class="mobile-stat">${item.compensation}</div>
-          <div class="mobile-stat mobile-points">${item.points}</div>
         </div>
-      `).join("");
-    }
+
+        <div class="mobile-cell">${item.played}</div>
+        <div class="mobile-cell">${item.wins}-${item.losses}-${item.ties}</div>
+        <div class="mobile-cell">${item.diff > 0 ? "+" : ""}${item.diff}</div>
+        <div class="mobile-cell">${item.compensation}</div>
+        <div class="mobile-cell mobile-points">${item.points}</div>
+      </div>
+    `).join("");
 
     formula.innerHTML =
-      state.setup.scoreMode === "fixed"
-        ? `<strong>Rumus:</strong> P = skor yang dikumpulkan + kompensasi.
-           Kompensasi setiap game yang lebih sedikit adalah
+      current.setup.scoreMode === "fixed"
+        ? `<strong>Rumus PDLUP-style:</strong>
+           P = skor yang dikumpulkan + kompensasi.
+           Kompensasi per game yang lebih sedikit:
            <strong>${result.compensationPerMissed}</strong> poin.
-           G terbanyak saat ini <strong>${result.maxGames}</strong>.`
-        : `<strong>Rumus skor manual:</strong> menang 3 poin, seri 1 poin,
-           kalah 0 poin. Tie-breaker memakai selisih skor.`;
+           G terbanyak: <strong>${result.maxGames}</strong>.`
+        : `<strong>Skor manual:</strong>
+           menang 3 poin, seri 1 poin, kalah 0 poin.
+           Tie-breaker menggunakan selisih skor.`;
+
+    lifecycleButton.textContent =
+      current.status === "completed"
+        ? "Buka Kembali Turnamen"
+        : "Tandai Turnamen Selesai";
+
+    lifecycleButton.className =
+      current.status === "completed"
+        ? "btn btn-soft"
+        : "btn btn-success";
+  }
+
+  function exportRows() {
+    return sortedRows().rows.filter(item => item.played > 0);
   }
 
   document.getElementById("exportCsv").addEventListener(
     "click",
     function () {
-      const state = PFApp.getState();
-      const result = calculation();
-      const rows = result.sorted.filter(item => item.played > 0);
+      const current = session();
+      const rows = exportRows();
 
       if (!rows.length) {
-        PFUI.toast("Belum ada hasil untuk diexport.");
+        PFUI.toast("Belum ada hasil pertandingan.");
         return;
       }
 
       const data = [
-        ["Nama pertandingan", state.setup.matchName],
-        ["Jenis random", state.setup.randomMode === "team" ? "Per Tim" : "Per Player"],
-        ["Sistem skor", state.setup.scoreMode === "fixed" ? `Total ${state.setup.pointsTotal}` : "Manual"],
+        ["Nama turnamen", current.setup.matchName],
+        ["Mode", current.setup.randomMode === "team" ? "Per Tim" : "Per Player"],
+        ["Ranking", sortMode.options[sortMode.selectedIndex].text],
         ["Tanggal export", new Date().toLocaleString("id-ID")],
         [],
         ["Rank", "Nama", "G", "W-L-T", "Diff", "+M", "P"]
@@ -140,7 +257,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       rows.forEach(item => {
         data.push([
-          item.rank,
+          item.displayRank,
           item.name,
           item.played,
           `${item.wins}-${item.losses}-${item.ties}`,
@@ -158,36 +275,51 @@ document.addEventListener("DOMContentLoaded", function () {
 
       PFUI.downloadText(
         csv,
-        `${PFUI.safeFileName(state.setup.matchName)}-leaderboard.csv`,
+        `${PFUI.safeFileName(current.setup.matchName)}-leaderboard.csv`,
         "text/csv;charset=utf-8"
       );
 
-      PFUI.toast("Leaderboard CSV berhasil dibuat.");
+      PFUI.toast("CSV leaderboard berhasil dibuat.");
+    }
+  );
+
+  document.getElementById("exportJson").addEventListener(
+    "click",
+    function () {
+      const current = session();
+
+      PFUI.downloadText(
+        JSON.stringify(current, null, 2),
+        `${PFUI.safeFileName(current.setup.matchName)}-turnamen.json`,
+        "application/json"
+      );
+
+      PFUI.toast("Backup turnamen berhasil dibuat.");
     }
   );
 
   document.getElementById("exportPng").addEventListener(
     "click",
     function () {
-      const state = PFApp.getState();
-      const rows = calculation().sorted.filter(item => item.played > 0);
+      const current = session();
+      const rows = exportRows();
 
       if (!rows.length) {
-        PFUI.toast("Belum ada hasil untuk diexport.");
+        PFUI.toast("Belum ada hasil pertandingan.");
         return;
       }
 
       const width = 1100;
-      const headerHeight = 180;
+      const header = 180;
       const rowHeight = 72;
-      const height = headerHeight + rows.length * rowHeight + 65;
+      const height = header + rows.length * rowHeight + 65;
       const canvas = document.createElement("canvas");
       const context = canvas.getContext("2d");
 
       canvas.width = width;
       canvas.height = height;
 
-      context.fillStyle = "#f4f7fb";
+      context.fillStyle = "#f3f6fb";
       context.fillRect(0, 0, width, height);
 
       context.fillStyle = "#246bfd";
@@ -195,34 +327,53 @@ document.addEventListener("DOMContentLoaded", function () {
 
       context.fillStyle = "#ffffff";
       context.font = "700 22px Arial";
-      context.fillText("PadelFlex Leaderboard", 52, 48);
+      context.fillText("PadelFlex Pro v4", 52, 47);
+
       context.font = "800 36px Arial";
-      context.fillText(state.setup.matchName, 52, 94);
+      context.fillText(
+        current.setup.matchName.slice(0, 42),
+        52,
+        94
+      );
 
       const columns = [52, 130, 535, 645, 785, 900, 1010];
       const headers = ["#", "Nama", "G", "W-L-T", "Diff", "+M", "P"];
 
-      context.fillStyle = "#69758a";
+      context.fillStyle = "#68758b";
       context.font = "700 17px Arial";
 
-      headers.forEach((header, index) => {
-        context.fillText(header, columns[index], 158);
+      headers.forEach((label, index) => {
+        context.fillText(label, columns[index], 158);
       });
 
       rows.forEach((item, index) => {
-        const y = headerHeight + index * rowHeight;
+        const y = header + index * rowHeight;
 
         context.fillStyle = "#ffffff";
         context.strokeStyle = "#e1e7f0";
         context.beginPath();
-        context.roundRect(36, y, width - 72, rowHeight - 10, 15);
+        context.roundRect(
+          36,
+          y,
+          width - 72,
+          rowHeight - 10,
+          15
+        );
         context.fill();
         context.stroke();
 
         context.fillStyle = "#172033";
         context.font = "700 19px Arial";
-        context.fillText(String(item.rank), columns[0], y + 38);
-        context.fillText(item.name.slice(0, 30), columns[1], y + 38);
+        context.fillText(
+          String(item.displayRank),
+          columns[0],
+          y + 38
+        );
+        context.fillText(
+          item.name.slice(0, 30),
+          columns[1],
+          y + 38
+        );
 
         context.font = "600 17px Arial";
         context.fillText(String(item.played), columns[2], y + 38);
@@ -232,14 +383,18 @@ document.addEventListener("DOMContentLoaded", function () {
           y + 38
         );
         context.fillText(String(item.diff), columns[4], y + 38);
-        context.fillText(String(item.compensation), columns[5], y + 38);
+        context.fillText(
+          String(item.compensation),
+          columns[5],
+          y + 38
+        );
 
         context.fillStyle = "#246bfd";
         context.font = "800 21px Arial";
         context.fillText(String(item.points), columns[6], y + 38);
       });
 
-      context.fillStyle = "#69758a";
+      context.fillStyle = "#68758b";
       context.font = "500 14px Arial";
       context.fillText(
         `Generated ${new Date().toLocaleString("id-ID")}`,
@@ -248,8 +403,9 @@ document.addEventListener("DOMContentLoaded", function () {
       );
 
       const anchor = document.createElement("a");
+
       anchor.download =
-        `${PFUI.safeFileName(state.setup.matchName)}-leaderboard.png`;
+        `${PFUI.safeFileName(current.setup.matchName)}-leaderboard.png`;
       anchor.href = canvas.toDataURL("image/png");
       anchor.click();
 
@@ -257,20 +413,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   );
 
-  document.getElementById("exportBackup").addEventListener(
-    "click",
-    function () {
-      const state = PFApp.getState();
+  lifecycleButton.addEventListener("click", function () {
+    const current = session();
 
-      PFUI.downloadText(
-        PFStorage.exportJson(state),
-        `${PFUI.safeFileName(state.setup.matchName)}-backup.json`,
-        "application/json"
-      );
+    try {
+      if (current.status === "completed") {
+        PFApp.reopenTournament();
+        PFUI.toast("Turnamen dibuka kembali.");
+      } else {
+        PFApp.completeTournament(false);
+        PFUI.toast("Turnamen ditandai selesai.");
+      }
 
-      PFUI.toast("Backup pertandingan berhasil dibuat.");
+      render();
+    } catch (error) {
+      PFUI.toast(error.message);
     }
-  );
+  });
+
+  sortMode.addEventListener("change", render);
 
   render();
 });

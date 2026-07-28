@@ -1,99 +1,104 @@
-# PadelFlex Flow v2
+# PadelFlex Pro v4
 
-Aplikasi web statis multi-page untuk pertandingan padel tanpa database.
+PadelFlex Pro v4 adalah aplikasi web statis multi-turnamen untuk mengelola
+pertandingan padel tanpa backend dan tanpa database server.
 
-## Alur
+## Fitur Utama
 
-1. Init pertandingan:
-   - nama match;
-   - sistem skor;
-   - random per player atau per tim;
-   - jumlah court;
-   - minimum game per peserta.
-2. Masukkan pemain atau tim.
-3. Submit pertandingan.
-4. Sistem membuat ronde otomatis berdasarkan pemerataan.
-5. Mainkan, input skor, skip match, atau tambahkan peserta baru.
-6. Export leaderboard.
+- Multi-turnamen dalam satu browser.
+- Status turnamen: Draft, Aktif, Selesai, dan Arsip.
+- Mode random Per Player dan Per Tim.
+- Sistem skor total otomatis atau skor manual.
+- Jumlah ronde otomatis berdasarkan pemerataan game.
+- Penambahan peserta di tengah turnamen.
+- Match yang sudah memiliki skor dan ronde aktif tetap dipertahankan.
+- Pemilihan pertandingan langsung tanpa tombol skip.
+- Pencarian pemain/tim dan filter ronde.
+- Edit skor lama.
+- Undo perubahan skor sampai 50 riwayat terakhir.
+- Indikator fairness jadwal.
+- Leaderboard PDLUP-style.
+- Ranking By Points, Wins, Difference, atau Win Rate.
+- Export CSV, PNG, dan JSON.
+- Display TV untuk pertandingan aktif dan leaderboard.
+- Duplikasi format turnamen.
+- Backup/restore seluruh turnamen.
+- Migrasi otomatis dari storage `padelflex_flow_v2`.
+- PWA dan offline cache.
 
-## Mode random
+## Halaman
 
-### Per Player
+- `index.html` — Tournament Hub.
+- `setup.html` — Inisialisasi turnamen.
+- `players.html` — Roster dan submit jadwal.
+- `matches.html` — Operator pertandingan.
+- `leaderboard.html` — Ranking dan export.
+- `display.html` — Tampilan TV.
+- `settings.html` — Backup, restore, arsip, dan penghapusan data.
 
-Nama pemain dimasukkan satu per satu. Sistem mengacak pasangan dan lawan pada
-setiap ronde, sambil mengurangi pasangan/lawan berulang.
+## Penyimpanan Tanpa Database
 
-### Per Tim
+Data disimpan pada browser menggunakan localStorage:
 
-Satu tim berisi dua pemain tetap. Sistem hanya mengacak lawan dan giliran
-bermain. Leaderboard dihitung per tim.
+```text
+padelflex_v4
+```
 
-## Penambahan peserta di tengah
+Reload halaman, menutup browser, atau restart Apache tidak menghapus data.
+Data tetap terikat pada browser dan origin yang sama.
 
-Ketika peserta baru ditambahkan setelah pertandingan disubmit:
+Alamat berikut dianggap berbeda oleh browser:
 
-- seluruh match yang sudah memiliki skor dipertahankan;
-- ronde yang sedang aktif dipertahankan;
-- match yang pernah ditunda dipertahankan;
-- match terjadwal setelahnya dihapus dan dibuat ulang;
-- jumlah ronde tambahan dihitung ulang agar game kembali semerata mungkin.
+```text
+http://localhost/padelflex-pro-v4/
+http://192.168.1.10/padelflex-pro-v4/
+```
 
-## Skip pertandingan
+Karena itu, gunakan alamat yang konsisten dan lakukan backup JSON secara rutin.
 
-Tombol **Tunda / Skip Match** memindahkan match ke belakang antrean. Match
-tersebut belum dianggap selesai dan belum masuk leaderboard. Ronde berikutnya
-dapat langsung dimainkan bila ronde aktif sudah tidak memiliki match lain.
+## Migrasi Versi Lama
 
-## Penyimpanan tanpa database
-
-Semua data disimpan pada `localStorage` browser menggunakan key:
+Saat `padelflex_v4` belum tersedia, aplikasi akan mencari:
 
 ```text
 padelflex_flow_v2
 ```
 
-Reload, menutup tab, atau restart Apache tidak menghapus data. Data hanya hilang
-jika sesi di-reset atau data situs browser dibersihkan.
+Data turnamen lama akan dibungkus menjadi satu session v4 secara otomatis.
+Data lama tidak dihapus.
 
 ## Instalasi XAMPP
 
-Ekstrak seluruh isi folder ke:
+Ekstrak folder ke:
 
 ```text
-C:\xampp\htdocs\padelflex
+C:\xampp\htdocs\padelflex-pro-v4
 ```
 
-Buka:
+Jalankan Apache lalu buka:
 
 ```text
-http://localhost/padelflex/
+http://localhost/padelflex-pro-v4/
 ```
 
-Tidak membutuhkan PHP, Node.js, atau database.
+Tidak memerlukan PHP, Node.js, MySQL, atau SQL Server.
 
+## PWA / Offline
 
-## Memainkan kembali match yang di-skip
+Service worker hanya aktif melalui HTTP/HTTPS, bukan saat file HTML dibuka
+langsung menggunakan `file://`.
 
-Versi 2.1 menampilkan bagian **Antrean Match Tertunda** di atas daftar ronde.
+Untuk pemasangan sebagai aplikasi:
 
-- Tekan **Mainkan Lagi** pada match yang dipilih.
-- Atau gunakan tombol tetap **Mainkan Match Tertunda** di bagian bawah layar.
-- Ronde yang sedang aktif akan dikembalikan ke antrean normal tanpa kehilangan
-  skor atau susunan.
-- Match tertunda menjadi ronde aktif dan input skornya terbuka.
-- Setelah match tertunda selesai, sistem dapat melanjutkan kembali ke ronde
-  normal berikutnya.
+1. Buka melalui `localhost` atau HTTPS.
+2. Pilih menu browser.
+3. Pilih **Install app** atau **Add to Home Screen**.
 
+## Display TV
 
-## Tampilan leaderboard mobile v2.2
+`display.html` membaca localStorage pada browser yang sama dan memperbarui
+tampilan setiap beberapa detik.
 
-Pada layar maksimal 720px, leaderboard berubah dari tabel horizontal menjadi
-daftar kartu seperti aplikasi turnamen mobile:
-
-- ringkasan nama pertandingan, tipe random, sistem skor, peserta, dan court;
-- header kolom tetap: G, W-L-T, Diff, +M, dan P;
-- medal untuk peringkat 1–3;
-- nama peserta diprioritaskan dan dipotong otomatis bila terlalu panjang;
-- tidak ada horizontal scroll;
-- navigasi bawah Rounds dan Leaderboard;
-- desktop tetap menggunakan tabel penuh.
+Tanpa backend/database, browser pada perangkat lain memiliki penyimpanan
+terpisah. Untuk layar TV yang berbeda perangkat, diperlukan sinkronisasi server
+pada versi mendatang.

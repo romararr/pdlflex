@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="theme-color" content="#246bfd">
+  <title>Display TV — PadelFlex Pro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-page="display">
+  <main class="display-page">
+    <header class="display-header">
+      <div>
+        <div class="eyebrow">Live Tournament Display</div>
+        <h1 id="displayName">PadelFlex Pro</h1>
+        <p id="displayMeta" style="color:var(--muted);margin:8px 0 0"></p>
+      </div>
+
+      <div style="text-align:right">
+        <strong id="displayClock" style="font-size:28px">--:--</strong>
+        <div style="margin-top:8px">
+          <a class="btn btn-secondary btn-sm" href="matches.html">Operator</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="display-grid">
+      <section class="display-current" id="displayCurrent"></section>
+      <aside class="display-leaderboard" id="displayLeaderboard"></aside>
+    </div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="assets/js/storage.js" defer></script>
+  <script src="assets/js/scheduler.js" defer></script>
+  <script src="assets/js/core.js" defer></script>
+  <script src="assets/js/common.js" defer></script>
+  <script src="assets/js/pages/display.js" defer></script>
+</body>
+</html>

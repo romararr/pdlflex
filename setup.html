@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <meta name="theme-color" content="#246bfd">
+  <meta name="description" content="PadelFlex Pro v4 - padel tournament manager tanpa database">
+  <title>Init Turnamen — PadelFlex Pro</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body data-page="setup">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">PF</span>
+        <span>
+          <strong>PadelFlex Pro</strong>
+          <small>Version 4 · Local-first</small>
+        </span>
+      </a>
+
+      <nav class="nav"><a class="nav-link" data-nav="hub" href="index.html">
+          <span class="nav-icon">⌂</span>Turnamen
+        </a>
+<a class="nav-link" data-nav="setup" href="setup.html">
+          <span class="nav-icon">⚙</span>Init
+        </a>
+<a class="nav-link" data-nav="players" href="players.html">
+          <span class="nav-icon">👥</span>Peserta
+        </a>
+<a class="nav-link" data-nav="matches" href="matches.html">
+          <span class="nav-icon">🎾</span>Pertandingan
+        </a>
+<a class="nav-link" data-nav="leaderboard" href="leaderboard.html">
+          <span class="nav-icon">🏆</span>Leaderboard
+        </a>
+<a class="nav-link" data-nav="display" href="display.html">
+          <span class="nav-icon">▣</span>Display TV
+        </a>
+<a class="nav-link" data-nav="settings" href="settings.html">
+          <span class="nav-icon">☷</span>Settings
+        </a></nav>
+
+      <div class="sidebar-footer">
+        <div class="local-note">
+          <strong style="display:block;color:#fff;margin-bottom:4px">
+            Tanpa database
+          </strong>
+          Multi-turnamen disimpan otomatis di browser dan dapat dibackup ke JSON.
+        </div>
+      </div>
+    </aside>
+
+    <section class="main-shell">
+      <header class="topbar">
+        <div class="topbar-copy">
+          <strong id="topbarTitle">PadelFlex Pro</strong>
+          <span id="topbarSubtitle">Multi-turnamen · tanpa database</span>
+        </div>
+
+        <div class="autosave">● <span>Tersimpan otomatis</span></div>
+      </header>
+
+      <main class="page">
+        <nav class="stepper" aria-label="Alur turnamen"><a class="step" data-step="1" href="setup.html">
+              <span>Langkah 1</span>
+              <strong>Init</strong>
+            </a><a class="step" data-step="2" href="players.html">
+              <span>Langkah 2</span>
+              <strong>Peserta</strong>
+            </a><a class="step" data-step="3" href="players.html">
+              <span>Langkah 3</span>
+              <strong>Submit</strong>
+            </a><a class="step" data-step="4" href="matches.html">
+              <span>Langkah 4</span>
+              <strong>Pertandingan</strong>
+            </a><a class="step" data-step="5" href="leaderboard.html">
+              <span>Langkah 5</span>
+              <strong>Leaderboard</strong>
+            </a></nav>
+
+        <div class="heading">
+          <div>
+            <div class="eyebrow">Langkah 1</div>
+            <h1>Init Turnamen</h1>
+            <p>Tentukan nama, jenis random, sistem skor, jumlah court, dan minimum game.</p>
+          </div>
+        </div>
+
+
+<div class="grid grid-sidebar">
+  <div class="card">
+    <div class="card-header">
+      <h2>Konfigurasi Turnamen</h2>
+      <span class="badge">Langkah 1</span>
+    </div>
+
+    <div class="card-body">
+      <div class="info hidden" id="setupLocked" style="margin-bottom:14px">
+        <strong>Konfigurasi dikunci.</strong>
+        Turnamen sudah disubmit agar jadwal dan leaderboard tetap konsisten.
+      </div>
+
+      <form id="setupForm">
+        <div class="field">
+          <label for="matchName">Nama turnamen</label>
+          <input
+            class="input"
+            id="matchName"
+            maxlength="70"
+            placeholder="Contoh: Padel Jumat Malam">
+        </div>
+
+        <div style="margin-top:15px">
+          <div class="field"><label>Jenis random</label></div>
+
+          <div class="mode-grid">
+            <label class="mode" data-mode>
+              <input type="radio" name="randomMode" value="player">
+              <strong>Per Player</strong>
+              <span>
+                Pasangan dan lawan diacak ulang pada setiap ronde.
+              </span>
+            </label>
+
+            <label class="mode" data-mode>
+              <input type="radio" name="randomMode" value="team">
+              <strong>Per Tim</strong>
+              <span>
+                Dua pemain tetap bersama. Sistem mengacak lawan dan giliran.
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-grid" style="margin-top:15px">
+          <div class="field">
+            <label for="scoreSystem">Sistem skor</label>
+            <select class="select" id="scoreSystem">
+              <option value="fixed:21">Total 21 · skor lawan otomatis</option>
+              <option value="fixed:15">Total 15 · skor lawan otomatis</option>
+              <option value="fixed:11">Total 11 · skor lawan otomatis</option>
+              <option value="manual">Skor manual · isi kedua sisi</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="courtCount">Jumlah court</label>
+            <select class="select" id="courtCount">
+              <option value="1">1 court</option>
+              <option value="2">2 court</option>
+              <option value="3">3 court</option>
+              <option value="4">4 court</option>
+              <option value="5">5 court</option>
+              <option value="6">6 court</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="minimumGames">Minimum game per peserta</label>
+            <input
+              class="input"
+              id="minimumGames"
+              type="number"
+              min="1"
+              max="30">
+          </div>
+        </div>
+
+        <p class="hint">
+          Jumlah ronde dihitung otomatis berdasarkan roster, court, dan
+          minimum game agar jumlah bermain semerata mungkin.
+        </p>
+
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-primary" type="submit" id="saveSetup">
+            Simpan &amp; Lanjut ke Peserta
+          </button>
+
+          <button class="btn btn-success hidden" type="button" id="resumeTournament">
+            Lanjutkan Turnamen
+          </button>
+
+          <a class="btn btn-secondary" href="index.html">
+            Kembali ke Dashboard
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>Fitur Pro v4</h2></div>
+    <div class="card-body">
+      <div class="list">
+        <div class="list-item">
+          <span class="avatar">∞</span>
+          <div class="list-main">
+            <div class="list-title">Multi-turnamen</div>
+            <div class="list-meta">Draft, aktif, selesai, dan arsip.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">↶</span>
+          <div class="list-main">
+            <div class="list-title">Undo dan edit skor</div>
+            <div class="list-meta">Koreksi hasil tanpa reset sesi.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">▣</span>
+          <div class="list-main">
+            <div class="list-title">Display TV</div>
+            <div class="list-meta">Tampilan pertandingan dan leaderboard.</div>
+          </div>
+        </div>
+
+        <div class="list-item">
+          <span class="avatar">⇩</span>
+          <div class="list-main">
+            <div class="list-title">PWA dan backup</div>
+            <div class="list-meta">Offline cache dan export JSON.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+      </main>
+    </section>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="assets/js/storage.js" defer></script>
+  <script src="assets/js/scheduler.js" defer></script>
+  <script src="assets/js/core.js" defer></script>
+  <script src="assets/js/common.js" defer></script>
+  <script src="assets/js/pages/setup.js" defer></script>
+</body>
+</html>

@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
   <meta name="description" content="PadelFlex Pro v4 - padel tournament manager tanpa database">
-  <title>Tournament Hub — PadelFlex Pro</title>
+  <title>Settings & Backup — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="assets/css/app.css">
 </head>
-<body data-page="hub">
+<body data-page="settings">
   <div class="app-shell">
     <aside class="sidebar">
       <a class="brand" href="index.html">
@@ -68,78 +68,78 @@
 
         <div class="heading">
           <div>
-            <div class="eyebrow">PadelFlex Pro v4</div>
-            <h1>Tournament Hub</h1>
-            <p>Kelola beberapa turnamen, lanjutkan sesi aktif, duplikasi format, arsipkan hasil, dan pantau pemerataan.</p>
+            <div class="eyebrow">Data lokal</div>
+            <h1>Settings & Backup</h1>
+            <p>Backup seluruh turnamen, pulihkan data, kelola arsip, dan gunakan mode PWA.</p>
           </div>
         </div>
 
 
-<div class="heading-actions" style="margin:-8px 0 18px">
-  <button class="btn btn-primary" id="newSession">
-    ＋ Turnamen Baru
-  </button>
+<div class="grid grid-sidebar">
+  <div class="grid">
+    <div class="card">
+      <div class="card-header"><h2>Backup Seluruh Data</h2></div>
+      <div class="card-body">
+        <div class="info" style="margin-bottom:14px">
+          <strong>Local-first.</strong>
+          Semua turnamen disimpan pada browser ini. Gunakan backup JSON sebelum
+          memindahkan server, domain, port, atau perangkat.
+        </div>
 
-  <button class="btn btn-soft hidden" id="installApp">
-    Install Aplikasi
-  </button>
-</div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="exportAll">
+            Export Semua JSON
+          </button>
 
-<div class="grid grid-4">
-  <div class="stat">
-    <span>Total turnamen</span>
-    <strong id="metricSessions">0</strong>
-    <small>termasuk arsip</small>
-  </div>
+          <button class="btn btn-soft" id="importAll">
+            Import Backup
+          </button>
 
-  <div class="stat">
-    <span>Sedang aktif</span>
-    <strong id="metricActive">0</strong>
-    <small>turnamen berjalan</small>
-  </div>
+          <input
+            id="importFile"
+            type="file"
+            accept="application/json"
+            hidden>
+        </div>
 
-  <div class="stat">
-    <span>Selesai</span>
-    <strong id="metricCompleted">0</strong>
-    <small>turnamen final</small>
-  </div>
-
-  <div class="stat">
-    <span>Total peserta</span>
-    <strong id="metricParticipants">0</strong>
-    <small>semua roster</small>
-  </div>
-</div>
-
-<div class="card" style="margin-top:18px">
-  <div class="card-body">
-    <div class="form-grid">
-      <div class="field">
-        <label for="sessionSearch">Cari turnamen</label>
-        <input
-          class="input"
-          id="sessionSearch"
-          placeholder="Ketik nama turnamen">
+        <div class="list-meta" style="margin-top:12px">
+          Storage key: <strong id="storageKey"></strong>
+        </div>
       </div>
+    </div>
 
-      <div class="field">
-        <label for="statusFilter">Status</label>
-        <select class="select" id="statusFilter">
-          <option value="all">Semua status</option>
-          <option value="draft">Draft</option>
-          <option value="active">Aktif</option>
-          <option value="completed">Selesai</option>
-          <option value="archived">Arsip</option>
-        </select>
+    <div class="card">
+      <div class="card-header"><h2>PWA / Offline</h2></div>
+      <div class="card-body">
+        <div class="info">
+          <strong>Bisa di-install.</strong>
+          Jalankan melalui HTTPS atau localhost, lalu pilih
+          <em>Install app</em> atau <em>Add to Home Screen</em> dari browser.
+          File aplikasi tetap dapat dibuka saat koneksi ke internet tidak tersedia.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2 style="color:var(--danger)">Zona Berbahaya</h2></div>
+      <div class="card-body">
+        <p class="hint" style="margin-top:0">
+          Menghapus seluruh turnamen, roster, ronde, skor, dan riwayat pada browser ini.
+        </p>
+
+        <button class="btn btn-danger" id="clearAll">
+          Hapus Seluruh Data
+        </button>
       </div>
     </div>
   </div>
-</div>
 
-<div
-  class="grid grid-3"
-  id="sessionGrid"
-  style="margin-top:18px">
+  <div class="card">
+    <div class="card-header"><h2>Arsip Turnamen</h2></div>
+    <div class="card-body">
+      <div class="list" id="archivedList"></div>
+    </div>
+  </div>
 </div>
 
       </main>
@@ -152,6 +152,6 @@
   <script src="assets/js/scheduler.js" defer></script>
   <script src="assets/js/core.js" defer></script>
   <script src="assets/js/common.js" defer></script>
-  <script src="assets/js/pages/hub.js" defer></script>
+  <script src="assets/js/pages/settings.js" defer></script>
 </body>
 </html>

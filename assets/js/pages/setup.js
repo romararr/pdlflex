@@ -1,29 +1,38 @@
 document.addEventListener("DOMContentLoaded", function () {
-  const state = PFApp.getState();
+  const session = PFApp.requireSession();
   const form = document.getElementById("setupForm");
-  const modeOptions = document.querySelectorAll("[data-mode-option]");
   const scoreSystem = document.getElementById("scoreSystem");
-  const lockedNotice = document.getElementById("lockedNotice");
+  const modeOptions = document.querySelectorAll("[data-mode]");
+  const resumeButton = document.getElementById("resumeTournament");
   const saveButton = document.getElementById("saveSetup");
-  const resumeButton = document.getElementById("resumeMatch");
+  const locked = document.getElementById("setupLocked");
 
-  document.getElementById("matchName").value = state.setup.matchName;
-  document.getElementById("courtCount").value = state.setup.courtCount;
-  document.getElementById("minimumGames").value = state.setup.minimumGames;
+  document.getElementById("matchName").value =
+    session.setup.matchName;
+  document.getElementById("courtCount").value =
+    session.setup.courtCount;
+  document.getElementById("minimumGames").value =
+    session.setup.minimumGames;
 
   scoreSystem.value =
-    state.setup.scoreMode === "manual"
+    session.setup.scoreMode === "manual"
       ? "manual"
-      : `fixed:${state.setup.pointsTotal}`;
+      : `fixed:${session.setup.pointsTotal}`;
 
-  document.querySelector(
-    `input[name="randomMode"][value="${state.setup.randomMode}"]`
-  ).checked = true;
+  const selectedMode = document.querySelector(
+    `input[name="randomMode"][value="${session.setup.randomMode}"]`
+  );
+
+  if (selectedMode) selectedMode.checked = true;
 
   function renderModes() {
     modeOptions.forEach(option => {
       const input = option.querySelector("input");
-      option.classList.toggle("selected", input.checked);
+
+      option.classList.toggle(
+        "selected",
+        input.checked
+      );
     });
   }
 
@@ -38,14 +47,14 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  if (state.submitted) {
+  if (session.submitted) {
     form.querySelectorAll("input, select").forEach(control => {
       control.disabled = true;
     });
 
     saveButton.classList.add("hidden");
     resumeButton.classList.remove("hidden");
-    lockedNotice.classList.remove("hidden");
+    locked.classList.remove("hidden");
   }
 
   form.addEventListener("submit", function (event) {
@@ -64,9 +73,12 @@ document.addEventListener("DOMContentLoaded", function () {
           : 0;
 
       PFApp.saveSetup({
-        matchName: document.getElementById("matchName").value,
+        matchName:
+          document.getElementById("matchName").value,
         randomMode:
-          document.querySelector('input[name="randomMode"]:checked').value,
+          document.querySelector(
+            'input[name="randomMode"]:checked'
+          ).value,
         scoreMode,
         pointsTotal,
         courtCount: Number(
@@ -77,7 +89,8 @@ document.addEventListener("DOMContentLoaded", function () {
         )
       });
 
-      PFUI.toast("Inisialisasi pertandingan tersimpan.");
+      PFUI.toast("Pengaturan turnamen tersimpan.");
+
       setTimeout(() => {
         location.href = "players.html";
       }, 350);
@@ -87,21 +100,10 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   resumeButton.addEventListener("click", function () {
-    location.href = "matches.html";
-  });
-
-  document.getElementById("resetSession").addEventListener("click", function () {
-    const confirmation = prompt(
-      'Ketik "RESET" untuk memulai pertandingan baru.'
-    );
-
-    if (confirmation !== "RESET") {
-      PFUI.toast("Reset dibatalkan.");
-      return;
-    }
-
-    PFApp.reset();
-    location.reload();
+    location.href =
+      session.status === "completed"
+        ? "leaderboard.html"
+        : "matches.html";
   });
 
   renderModes();

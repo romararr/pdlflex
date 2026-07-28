@@ -1,107 +1,134 @@
 document.addEventListener("DOMContentLoaded", function () {
-  const state = PFApp.getState();
+  const session = PFApp.requireSession();
   const playerForm = document.getElementById("playerForm");
   const teamForm = document.getElementById("teamForm");
   const list = document.getElementById("entityList");
   const count = document.getElementById("entityCount");
+  const recommendation = document.getElementById("recommendation");
   const submitButton = document.getElementById("submitTournament");
-  const recommendationBox = document.getElementById("recommendation");
-  const modeTitle = document.getElementById("modeTitle");
+  const continueButton = document.getElementById("continueTournament");
+  const batchPanel = document.getElementById("batchPanel");
+  const isTeam = session.setup.randomMode === "team";
 
-  const isTeamMode = state.setup.randomMode === "team";
+  playerForm.classList.toggle("hidden", isTeam);
+  teamForm.classList.toggle("hidden", !isTeam);
+  batchPanel.classList.toggle("hidden", isTeam);
 
-  playerForm.classList.toggle("hidden", isTeamMode);
-  teamForm.classList.toggle("hidden", !isTeamMode);
+  document.getElementById("rosterMode").textContent =
+    isTeam ? "Tim Tetap" : "Pemain Individual";
 
-  modeTitle.textContent = isTeamMode
-    ? "Masukkan Tim Tetap"
-    : "Masukkan Nama Pemain";
+  function allEntities() {
+    return PFApp.getAllEntities();
+  }
 
   function renderRecommendation() {
-    const entities = PFApp.getEntities();
+    const active = PFApp.getEntities();
+    const minimum = isTeam ? 2 : 4;
 
-    if (
-      entities.length <
-      (isTeamMode ? 2 : 4)
-    ) {
-      recommendationBox.innerHTML =
-        `<strong>Belum cukup peserta.</strong> ` +
-        (isTeamMode
-          ? "Masukkan minimal 2 tim."
-          : "Masukkan minimal 4 pemain.");
+    if (active.length < minimum) {
+      recommendation.innerHTML =
+        `<strong>Roster belum cukup.</strong> ` +
+        (isTeam
+          ? "Minimal 2 tim aktif."
+          : "Minimal 4 pemain aktif.");
 
       submitButton.disabled = true;
       return;
     }
 
-    const recommendation = PFApp.getRecommendation([]);
+    const result = PFApp.getRecommendation(
+      session,
+      session.submitted ? null : []
+    );
 
-    if (!recommendation.available) {
-      recommendationBox.innerHTML =
+    if (!result.available) {
+      recommendation.innerHTML =
         `<strong>Jadwal belum dapat dibuat.</strong> ` +
-        PFUI.escapeHtml(recommendation.reason);
+        PFUI.escapeHtml(result.reason);
 
       submitButton.disabled = true;
       return;
     }
 
-    recommendationBox.innerHTML =
-      recommendation.exact
-        ? `<strong>Jadwal siap:</strong> ${recommendation.rounds} ronde,
-           ${recommendation.courts} court terpakai, dan setiap
-           ${isTeamMode ? "tim" : "pemain"} mendapat
-           ${recommendation.minGames} game.`
-        : `<strong>Jadwal siap:</strong> ${recommendation.rounds} ronde.
-           Hasil akhir ${recommendation.minGames}-${recommendation.maxGames}
-           game per ${isTeamMode ? "tim" : "pemain"}.`;
+    recommendation.innerHTML =
+      result.exact
+        ? `<strong>Pemerataan penuh:</strong>
+           ${result.rounds} ronde tambahan,
+           ${result.courts} court terpakai, dan setiap
+           ${isTeam ? "tim" : "pemain"} mencapai
+           ${result.minGames} game.`
+        : `<strong>Pemerataan terbaik:</strong>
+           ${result.rounds} ronde tambahan dengan hasil
+           ${result.minGames}-${result.maxGames} game per
+           ${isTeam ? "tim" : "pemain"}.`;
 
-    submitButton.disabled = state.submitted;
+    submitButton.disabled = session.submitted;
   }
 
   function render() {
-    const current = PFApp.getState();
-    const entities =
-      current.setup.randomMode === "team"
-        ? current.teams
-        : current.players;
+    const entities = allEntities();
+    const activeCount = entities.filter(
+      entity => entity.active !== false
+    ).length;
 
     count.textContent =
-      `${entities.filter(entity => entity.active !== false).length} aktif ` +
-      `dari ${entities.length}`;
+      `${activeCount} aktif dari ${entities.length}`;
 
     if (!entities.length) {
       list.innerHTML = `
         <div class="empty">
-          <div class="empty-icon">${isTeamMode ? "👥" : "＋"}</div>
-          <strong>Belum ada ${isTeamMode ? "tim" : "pemain"}</strong>
-          <div>Tambahkan peserta untuk menyiapkan jadwal otomatis.</div>
+          <div class="empty-icon">👥</div>
+          <strong>Roster masih kosong</strong>
+          <div>
+            Tambahkan ${isTeam ? "tim" : "pemain"} untuk membuat jadwal.
+          </div>
         </div>`;
     } else {
       list.innerHTML = entities.map(entity => {
-        const details = isTeamMode
-          ? `${PFUI.escapeHtml(entity.player1)} &amp; ${PFUI.escapeHtml(entity.player2)}`
-          : `${entity.joinedAtRound > 1
-              ? `Masuk sejak ronde ${entity.joinedAtRound}`
-              : "Peserta awal"}`;
+        const details = isTeam
+          ? `${entity.player1} & ${entity.player2}`
+          : (
+              entity.joinedAtRound > 1
+                ? `Masuk sejak ronde ${entity.joinedAtRound}`
+                : "Peserta awal"
+            );
 
         return `
-          <div class="list-item" style="${entity.active === false ? "opacity:.55" : ""}">
+          <div
+            class="list-item"
+            style="${entity.active === false ? "opacity:.55" : ""}">
+
             <div style="display:flex;align-items:center;gap:11px;min-width:0">
               <span class="avatar">
-                ${PFUI.escapeHtml(entity.name.slice(0, 2).toUpperCase())}
+                ${PFUI.escapeHtml(
+                  entity.name.slice(0, 2).toUpperCase()
+                )}
               </span>
+
               <div class="list-main">
-                <div class="list-title">${PFUI.escapeHtml(entity.name)}</div>
-                <div class="list-meta">${details}</div>
+                <div class="list-title">
+                  ${PFUI.escapeHtml(entity.name)}
+                </div>
+                <div class="list-meta">
+                  ${PFUI.escapeHtml(details)}
+                </div>
               </div>
             </div>
+
             <div class="list-actions">
-              <button class="btn btn-soft btn-sm"
-                data-action="toggle" data-id="${entity.id}">
-                ${entity.active === false ? "Aktifkan" : "Istirahatkan"}
+              <button
+                class="btn btn-soft btn-sm"
+                data-action="toggle"
+                data-id="${entity.id}">
+                ${entity.active === false
+                  ? "Aktifkan"
+                  : "Istirahatkan"}
               </button>
-              <button class="btn btn-danger btn-sm"
-                data-action="remove" data-id="${entity.id}">
+
+              <button
+                class="btn btn-danger btn-sm"
+                data-action="remove"
+                data-id="${entity.id}">
                 Hapus
               </button>
             </div>
@@ -109,11 +136,19 @@ document.addEventListener("DOMContentLoaded", function () {
       }).join("");
     }
 
-    if (current.submitted) {
-      submitButton.classList.add("hidden");
-      document.getElementById("continueMatch").classList.remove("hidden");
-      document.getElementById("midSessionNotice").classList.remove("hidden");
-    }
+    document
+      .getElementById("midSessionNotice")
+      .classList.toggle("hidden", !session.submitted);
+
+    submitButton.classList.toggle(
+      "hidden",
+      session.submitted
+    );
+
+    continueButton.classList.toggle(
+      "hidden",
+      !session.submitted
+    );
 
     renderRecommendation();
   }
@@ -126,12 +161,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
       const rebuilt = PFApp.addPlayer(name);
+
       input.value = "";
       render();
 
       PFUI.toast(
         rebuilt
-          ? `${name} ditambahkan. ${rebuilt.generated} ronde mendatang disusun ulang.`
+          ? `${name} ditambahkan. ${rebuilt.generated} ronde mendatang dibuat ulang.`
           : `${name} ditambahkan.`
       );
     } catch (error) {
@@ -142,22 +178,22 @@ document.addEventListener("DOMContentLoaded", function () {
   teamForm.addEventListener("submit", function (event) {
     event.preventDefault();
 
-    const teamName = document.getElementById("teamName");
+    const name = document.getElementById("teamName");
     const player1 = document.getElementById("teamPlayer1");
     const player2 = document.getElementById("teamPlayer2");
 
     try {
+      const createdName =
+        name.value.trim() ||
+        `${player1.value.trim()} & ${player2.value.trim()}`;
+
       const rebuilt = PFApp.addTeam(
-        teamName.value,
+        name.value,
         player1.value,
         player2.value
       );
 
-      const createdName =
-        teamName.value.trim() ||
-        `${player1.value.trim()} & ${player2.value.trim()}`;
-
-      teamName.value = "";
+      name.value = "";
       player1.value = "";
       player2.value = "";
 
@@ -165,7 +201,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       PFUI.toast(
         rebuilt
-          ? `${createdName} ditambahkan. ${rebuilt.generated} ronde mendatang disusun ulang.`
+          ? `${createdName} ditambahkan. Jadwal mendatang disusun ulang.`
           : `${createdName} ditambahkan.`
       );
     } catch (error) {
@@ -173,35 +209,74 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  document.getElementById("addBatch").addEventListener(
+    "click",
+    function () {
+      const textarea = document.getElementById("batchNames");
+      const names = textarea.value
+        .split(/\r?\n|,/)
+        .map(name => name.trim())
+        .filter(Boolean);
+
+      if (!names.length) {
+        PFUI.toast("Belum ada nama untuk ditambahkan.");
+        return;
+      }
+
+      let added = 0;
+      const errors = [];
+
+      names.forEach(name => {
+        try {
+          PFApp.addPlayer(name);
+          added++;
+        } catch (error) {
+          errors.push(`${name}: ${error.message}`);
+        }
+      });
+
+      textarea.value = "";
+      render();
+
+      PFUI.toast(
+        `${added} pemain ditambahkan` +
+        (errors.length ? `, ${errors.length} dilewati.` : ".")
+      );
+    }
+  );
+
   list.addEventListener("click", function (event) {
     const button = event.target.closest("[data-action]");
     if (!button) return;
 
-    const id = button.dataset.id;
-    const entity = PFApp.getEntity(id);
+    const entity = PFApp.getEntity(button.dataset.id);
 
     if (!entity) return;
 
     try {
       if (button.dataset.action === "toggle") {
-        const active = entity.active === false;
-        const rebuilt = PFApp.setEntityActive(id, active);
+        const nextActive = entity.active === false;
+
+        PFApp.setEntityActive(
+          entity.id,
+          nextActive
+        );
 
         PFUI.toast(
-          rebuilt
-            ? `${entity.name} ${active ? "diaktifkan" : "diistirahatkan"}. Jadwal mendatang disusun ulang.`
-            : `${entity.name} ${active ? "diaktifkan" : "diistirahatkan"}.`
+          `${entity.name} ${nextActive
+            ? "diaktifkan"
+            : "diistirahatkan"}.`
         );
       }
 
       if (button.dataset.action === "remove") {
         if (!confirm(`Hapus ${entity.name}?`)) return;
 
-        const result = PFApp.removeEntity(id);
+        const result = PFApp.removeEntity(entity.id);
 
         PFUI.toast(
           result.deactivated
-            ? "Peserta sudah masuk pertandingan aktif/selesai sehingga dinonaktifkan."
+            ? "Peserta sudah memiliki hasil/ronde aktif sehingga dinonaktifkan."
             : "Peserta dihapus."
         );
       }
@@ -217,7 +292,7 @@ document.addEventListener("DOMContentLoaded", function () {
       const result = PFApp.submitTournament();
 
       PFUI.toast(
-        `${result.generated} ronde dibuat otomatis.`
+        `${result.generated} ronde berhasil dibuat.`
       );
 
       setTimeout(() => {
@@ -228,12 +303,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  document.getElementById("continueMatch").addEventListener(
-    "click",
-    function () {
-      location.href = "matches.html";
-    }
-  );
+  continueButton.addEventListener("click", function () {
+    location.href =
+      session.status === "completed"
+        ? "leaderboard.html"
+        : "matches.html";
+  });
 
   render();
 });
