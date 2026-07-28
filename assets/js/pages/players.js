@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+  if (window.__pfGuardRedirecting) return;
+
   const session = PFApp.requireSession();
   const playerForm = document.getElementById("playerForm");
   const teamForm = document.getElementById("teamForm");
@@ -9,10 +11,23 @@ document.addEventListener("DOMContentLoaded", function () {
   const continueButton = document.getElementById("continueTournament");
   const batchPanel = document.getElementById("batchPanel");
   const isTeam = session.setup.randomMode === "team";
+  const readOnly =
+    session.status === "completed" ||
+    session.status === "archived";
 
   playerForm.classList.toggle("hidden", isTeam);
   teamForm.classList.toggle("hidden", !isTeam);
   batchPanel.classList.toggle("hidden", isTeam);
+
+  if (readOnly) {
+    document
+      .querySelectorAll(
+        "#playerForm input, #playerForm button, #teamForm input, #teamForm button, #batchPanel textarea, #batchPanel button"
+      )
+      .forEach(control => {
+        control.disabled = true;
+      });
+  }
 
   document.getElementById("rosterMode").textContent =
     isTeam ? "Tim Tetap" : "Pemain Individual";
@@ -50,15 +65,20 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
+    const courtText = result.variableCourts
+      ? `${result.minCourts}-${result.maxCourtsUsed} court per ronde`
+      : `${result.maxCourtsUsed} court per ronde`;
+
     recommendation.innerHTML =
       result.exact
         ? `<strong>Pemerataan penuh:</strong>
            ${result.rounds} ronde tambahan,
-           ${result.courts} court terpakai, dan setiap
+           ${courtText}, dan setiap
            ${isTeam ? "tim" : "pemain"} mencapai
            ${result.minGames} game.`
         : `<strong>Pemerataan terbaik:</strong>
-           ${result.rounds} ronde tambahan dengan hasil
+           ${result.rounds} ronde tambahan,
+           ${courtText}, dengan hasil
            ${result.minGames}-${result.maxGames} game per
            ${isTeam ? "tim" : "pemain"}.`;
 
@@ -119,7 +139,8 @@ document.addEventListener("DOMContentLoaded", function () {
               <button
                 class="btn btn-soft btn-sm"
                 data-action="toggle"
-                data-id="${entity.id}">
+                data-id="${entity.id}"
+                ${readOnly ? "disabled" : ""}>
                 ${entity.active === false
                   ? "Aktifkan"
                   : "Istirahatkan"}
@@ -128,7 +149,8 @@ document.addEventListener("DOMContentLoaded", function () {
               <button
                 class="btn btn-danger btn-sm"
                 data-action="remove"
-                data-id="${entity.id}">
+                data-id="${entity.id}"
+                ${readOnly ? "disabled" : ""}>
                 Hapus
               </button>
             </div>
@@ -136,9 +158,18 @@ document.addEventListener("DOMContentLoaded", function () {
       }).join("");
     }
 
-    document
-      .getElementById("midSessionNotice")
-      .classList.toggle("hidden", !session.submitted);
+    const notice = document.getElementById("midSessionNotice");
+
+    notice.classList.toggle(
+      "hidden",
+      !session.submitted && !readOnly
+    );
+
+    if (readOnly) {
+      notice.innerHTML =
+        `<strong>Roster dikunci.</strong> ` +
+        `Turnamen sudah selesai. Buka kembali turnamen dari leaderboard sebelum mengubah peserta.`;
+    }
 
     submitButton.classList.toggle(
       "hidden",
@@ -223,25 +254,21 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      let added = 0;
-      const errors = [];
+      try {
+        const result = PFApp.addPlayersBatch(names);
 
-      names.forEach(name => {
-        try {
-          PFApp.addPlayer(name);
-          added++;
-        } catch (error) {
-          errors.push(`${name}: ${error.message}`);
-        }
-      });
+        textarea.value = "";
+        render();
 
-      textarea.value = "";
-      render();
-
-      PFUI.toast(
-        `${added} pemain ditambahkan` +
-        (errors.length ? `, ${errors.length} dilewati.` : ".")
-      );
+        PFUI.toast(
+          `${result.addedNames.length} pemain ditambahkan` +
+          (result.skipped.length
+            ? `, ${result.skipped.length} duplikat dilewati.`
+            : ".")
+        );
+      } catch (error) {
+        PFUI.toast(error.message);
+      }
     }
   );
 

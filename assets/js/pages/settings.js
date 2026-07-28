@@ -79,6 +79,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const reader = new FileReader();
 
     reader.onload = function () {
+      if (
+        !confirm(
+          "Import backup akan mengganti seluruh data PadelFlex pada browser ini. Lanjutkan?"
+        )
+      ) {
+        PFUI.toast("Import dibatalkan.");
+        return;
+      }
+
       try {
         const imported = PFStorage.importJson(
           reader.result

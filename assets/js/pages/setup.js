@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+  if (window.__pfGuardRedirecting) return;
+
   const session = PFApp.requireSession();
   const form = document.getElementById("setupForm");
   const scoreSystem = document.getElementById("scoreSystem");

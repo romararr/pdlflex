@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+  if (window.__pfGuardRedirecting) return;
+
   const desktopBody = document.getElementById("leaderboardBody");
   const mobileRows = document.getElementById("mobileLeaderboardRows");
   const sortMode = document.getElementById("rankingMode");
@@ -45,29 +47,59 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     }
 
-    let previous = null;
+    function tieKey(item) {
+      if (mode === "wins") {
+        return [
+          item.wins,
+          item.points,
+          item.diff,
+          item.scored,
+          item.losses,
+          item.ties
+        ].join("|");
+      }
+
+      if (mode === "diff") {
+        return [
+          item.diff,
+          item.points,
+          item.wins,
+          item.scored,
+          item.losses,
+          item.ties
+        ].join("|");
+      }
+
+      if (mode === "winrate") {
+        return [
+          item.winRate.toFixed(8),
+          item.played,
+          item.points,
+          item.diff,
+          item.wins,
+          item.scored
+        ].join("|");
+      }
+
+      return [
+        item.points,
+        item.diff,
+        item.wins,
+        item.scored,
+        item.losses,
+        item.ties
+      ].join("|");
+    }
+
+    let previousKey = null;
     let currentRank = 0;
 
     rows.forEach((item, index) => {
-      const metric =
-        mode === "wins" ? item.wins :
-        mode === "diff" ? item.diff :
-        mode === "winrate" ? item.winRate :
-        item.points;
-
-      const previousMetric =
-        previous
-          ? (
-              mode === "wins" ? previous.wins :
-              mode === "diff" ? previous.diff :
-              mode === "winrate" ? previous.winRate :
-              previous.points
-            )
-          : null;
+      const currentKey = tieKey(item);
 
       if (
-        !previous ||
-        metric !== previousMetric ||
+        previousKey === null ||
+        currentKey !== previousKey ||
         item.played === 0
       ) {
         currentRank = index + 1;
@@ -78,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
           ? currentRank
           : null;
 
-      previous = item;
+      previousKey = currentKey;
     });
 
     return {
@@ -218,6 +250,8 @@ document.addEventListener("DOMContentLoaded", function () {
            G terbanyak: <strong>${result.maxGames}</strong>.`
         : `<strong>Skor manual:</strong>
            menang 3 poin, seri 1 poin, kalah 0 poin.
+           Peserta yang tertinggal satu game mendapat
+           <strong>+${result.compensationPerMissed}</strong> poin pada +M.
            Tie-breaker menggunakan selisih skor.`;
 
     lifecycleButton.textContent =

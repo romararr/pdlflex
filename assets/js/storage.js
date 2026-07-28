@@ -118,18 +118,46 @@
     }
   }
 
-  function load() {
+  function quarantineCorruptData(raw, error) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const quarantineKey =
+        `${STORAGE_KEY}_corrupt_${Date.now()}`;
 
       if (raw) {
-        return normalizeRoot(JSON.parse(raw));
+        localStorage.setItem(quarantineKey, raw);
       }
 
+      localStorage.removeItem(STORAGE_KEY);
+      console.warn(
+        `Data rusak dipindahkan ke ${quarantineKey}:`,
+        error
+      );
+    } catch (quarantineError) {
+      console.warn(
+        "Data rusak tidak dapat dikarantina:",
+        quarantineError
+      );
+    }
+  }
+
+  function load() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+
+    if (!raw) {
       return normalizeRoot(migrateLegacy() || defaultRoot());
+    }
+
+    try {
+      const parsed = JSON.parse(raw);
+
+      if (!parsed || !Array.isArray(parsed.sessions)) {
+        throw new Error("Struktur root PadelFlex tidak valid.");
+      }
+
+      return normalizeRoot(parsed);
     } catch (error) {
-      console.error("Gagal membaca penyimpanan:", error);
-      return defaultRoot();
+      quarantineCorruptData(raw, error);
+      return normalizeRoot(migrateLegacy() || defaultRoot());
     }
   }
 
@@ -154,9 +182,22 @@
 
     if (
       !parsed ||
-      !Array.isArray(parsed.sessions)
+      !Array.isArray(parsed.sessions) ||
+      parsed.sessions.some(session =>
+        !session ||
+        typeof session.id !== "string" ||
+        !session.id ||
+        !session.setup ||
+        typeof session.setup.matchName !== "string"
+      )
     ) {
       throw new Error("Format backup PadelFlex tidak valid.");
+    }
+
+    const ids = parsed.sessions.map(session => session.id);
+
+    if (new Set(ids).size !== ids.length) {
+      throw new Error("Backup memiliki ID turnamen yang duplikat.");
     }
 
     return save(parsed);

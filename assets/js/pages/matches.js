@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+  if (window.__pfGuardRedirecting) return;
+
   const chooser = document.getElementById("matchChooser");
   const roundsContainer = document.getElementById("roundsContainer");
   const filterStatus = document.getElementById("matchStatusFilter");
@@ -12,6 +14,18 @@ document.addEventListener("DOMContentLoaded", function () {
   const undoScore = document.getElementById("undoScore");
   const nextRound = document.getElementById("nextRound");
   const completeTournament = document.getElementById("completeTournament");
+  const extraMatchSection = document.getElementById("extraMatchSection");
+  const manualPlayerSlots = document.getElementById("manualPlayerSlots");
+  const extraMatchCourt = document.getElementById("extraMatchCourt");
+  const extraMatchLabel = document.getElementById("extraMatchLabel");
+  const activateExtraMatch = document.getElementById("activateExtraMatch");
+  const randomExtraPlayers = document.getElementById("randomExtraPlayers");
+  const clearExtraPlayers = document.getElementById("clearExtraPlayers");
+  const createExtraMatch = document.getElementById("createExtraMatch");
+  const addExtraMatch = document.getElementById("addExtraMatch");
+  const extraMatchWeightInfo = document.getElementById("extraMatchWeightInfo");
+
+  let extraSelection = [];
 
   function session() {
     return PFApp.requireSession();
@@ -38,6 +52,125 @@ document.addEventListener("DOMContentLoaded", function () {
     const ids = side === "A" ? match.teamA : match.teamB;
 
     return PFApp.entityDetails(ids[0], current);
+  }
+
+
+  function extraRequiredCount() {
+    return session().setup.randomMode === "team"
+      ? 2
+      : 4;
+  }
+
+  function extraEntityLabel() {
+    return session().setup.randomMode === "team"
+      ? "Tim"
+      : "Player";
+  }
+
+  function renderExtraMatchBuilder() {
+    const current = session();
+    const entities = PFApp.getEntities(current);
+    const required = extraRequiredCount();
+    const completed = current.status === "completed";
+
+    extraSelection = extraSelection
+      .slice(0, required)
+      .map(id =>
+        entities.some(entity => entity.id === id)
+          ? id
+          : ""
+      );
+
+    while (extraSelection.length < required) {
+      extraSelection.push("");
+    }
+
+    const selectedIds = new Set(
+      extraSelection.filter(Boolean)
+    );
+
+    manualPlayerSlots.innerHTML = extraSelection
+      .map((selectedId, index) => `
+        <div class="manual-slot">
+          <label>${extraEntityLabel()} ${index + 1}</label>
+          <select
+            class="select"
+            data-extra-slot="${index}"
+            ${completed ? "disabled" : ""}>
+            <option value="">Pilih ${extraEntityLabel().toLowerCase()}</option>
+            ${entities.map(entity => {
+              const selected = entity.id === selectedId;
+              const usedElsewhere =
+                selectedIds.has(entity.id) &&
+                !selected;
+
+              return `
+                <option
+                  value="${entity.id}"
+                  ${selected ? "selected" : ""}
+                  ${usedElsewhere ? "disabled" : ""}>
+                  ${PFUI.escapeHtml(entity.name)}
+                </option>`;
+            }).join("")}
+          </select>
+        </div>
+      `)
+      .join("");
+
+    const previousCourt = extraMatchCourt.value || "1";
+
+    extraMatchCourt.innerHTML = Array.from(
+      {
+        length: Math.max(
+          1,
+          Number(current.setup.courtCount)
+        )
+      },
+      (_, index) => `
+        <option value="${index + 1}">
+          Court ${index + 1}
+        </option>
+      `
+    ).join("");
+
+    if (
+      Array.from(extraMatchCourt.options)
+        .some(option => option.value === previousCourt)
+    ) {
+      extraMatchCourt.value = previousCourt;
+    }
+
+    const weight = PFApp.getCompensationPerMissed(current);
+
+    extraMatchWeightInfo.innerHTML =
+      current.setup.scoreMode === "fixed"
+        ? `<strong>Bobot otomatis:</strong>
+           match tambahan memakai sistem total
+           <strong>${current.setup.pointsTotal}</strong>.
+           Peserta yang tertinggal satu game akan mendapat
+           <strong>+${weight}</strong> pada kolom +M.`
+        : `<strong>Bobot otomatis:</strong>
+           menang 3 poin, seri 1 poin, dan peserta yang tertinggal satu game
+           mendapat <strong>+${weight}</strong> poin kompensasi.`;
+
+    createExtraMatch.disabled =
+      completed ||
+      entities.length < required;
+
+    randomExtraPlayers.disabled =
+      completed ||
+      entities.length < required;
+
+    clearExtraPlayers.disabled = completed;
+    extraMatchCourt.disabled = completed;
+    extraMatchLabel.disabled = completed;
+    activateExtraMatch.disabled = completed;
+
+    if (completed) {
+      extraMatchWeightInfo.innerHTML =
+        `<strong>Turnamen sudah selesai.</strong>
+         Buka kembali turnamen dari leaderboard untuk menambah match.`;
+    }
   }
 
   function pendingMatches() {
@@ -147,6 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <div class="match-choice ${active ? "active" : ""}">
           <div style="display:flex;justify-content:space-between;gap:7px">
             <span class="badge ${active ? "badge-success" : ""}">
+              ${round.kind === "manual_extra" ? "Tambahan · " : ""}
               Ronde ${round.number} · Court ${match.court}
             </span>
             <span class="list-meta">
@@ -206,7 +340,12 @@ document.addEventListener("DOMContentLoaded", function () {
         id="match-${match.id}">
 
         <div class="match-top">
-          <span class="court">Court ${match.court}</span>
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+            <span class="court">Court ${match.court}</span>
+            ${match.isManualExtra
+              ? '<span class="badge badge-warning">Match Tambahan</span>'
+              : ""}
+          </div>
           ${matchStatus(round, match)}
         </div>
 
@@ -276,6 +415,17 @@ document.addEventListener("DOMContentLoaded", function () {
               data-match="${match.id}">
               Aktifkan Match Ini
             </button>` : ""}
+
+          ${match.isManualExtra &&
+            !match.completed &&
+            current.status !== "completed" ? `
+            <button
+              class="btn btn-danger btn-sm"
+              data-action="delete-extra"
+              data-round="${round.id}"
+              data-match="${match.id}">
+              Hapus Match Tambahan
+            </button>` : ""}
         </div>
       </div>`;
   }
@@ -330,7 +480,12 @@ document.addEventListener("DOMContentLoaded", function () {
       <section class="round" id="round-${round.id}">
         <div class="round-head">
           <div>
-            <strong>Ronde ${round.number}</strong>
+            <strong>
+              Ronde ${round.number}
+              ${round.kind === "manual_extra"
+                ? '<span class="badge badge-warning manual-extra-label">Tambahan</span>'
+                : ""}
+            </strong>
             <small>
               ${round.matches.filter(match => match.completed).length}
               dari ${round.matches.length} match selesai
@@ -455,6 +610,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function render() {
     renderSummary();
+    renderExtraMatchBuilder();
     renderChooser();
     renderRounds();
     renderSticky();
@@ -515,6 +671,20 @@ document.addEventListener("DOMContentLoaded", function () {
         render();
         PFUI.toast("Skor dibuka untuk diedit.");
       }
+
+      if (button.dataset.action === "delete-extra") {
+        if (!confirm("Hapus match tambahan ini?")) {
+          return;
+        }
+
+        PFApp.removeManualMatch(
+          button.dataset.round,
+          button.dataset.match
+        );
+
+        render();
+        PFUI.toast("Match tambahan dihapus.");
+      }
     } catch (error) {
       PFUI.toast(error.message);
     }
@@ -538,6 +708,80 @@ document.addEventListener("DOMContentLoaded", function () {
       PFUI.toast(error.message);
       render();
     }
+  });
+
+
+  manualPlayerSlots.addEventListener("change", function (event) {
+    const select = event.target.closest("[data-extra-slot]");
+    if (!select) return;
+
+    const index = Number(select.dataset.extraSlot);
+    extraSelection[index] = select.value;
+    renderExtraMatchBuilder();
+  });
+
+  randomExtraPlayers.addEventListener("click", function () {
+    try {
+      extraSelection =
+        PFApp.suggestManualMatchParticipants();
+
+      renderExtraMatchBuilder();
+      PFUI.toast(
+        "Peserta diacak dengan prioritas jumlah main paling sedikit."
+      );
+    } catch (error) {
+      PFUI.toast(error.message);
+    }
+  });
+
+  clearExtraPlayers.addEventListener("click", function () {
+    extraSelection =
+      Array(extraRequiredCount()).fill("");
+
+    renderExtraMatchBuilder();
+  });
+
+  createExtraMatch.addEventListener("click", function () {
+    try {
+      const result = PFApp.addManualMatch(
+        extraSelection,
+        {
+          court: Number(extraMatchCourt.value),
+          label: extraMatchLabel.value,
+          activateNow: activateExtraMatch.checked
+        }
+      );
+
+      extraSelection =
+        Array(extraRequiredCount()).fill("");
+
+      activateExtraMatch.checked = false;
+      render();
+
+      PFUI.toast(
+        `Match tambahan dibuat. Bobot kompensasi +${result.compensationPerMissed} per game tertinggal.`
+      );
+
+      if (result.round.status === "active") {
+        setTimeout(() => {
+          document
+            .getElementById(`match-${result.match.id}`)
+            ?.scrollIntoView({
+              behavior: "smooth",
+              block: "center"
+            });
+        }, 80);
+      }
+    } catch (error) {
+      PFUI.toast(error.message);
+    }
+  });
+
+  addExtraMatch.addEventListener("click", function () {
+    extraMatchSection.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
   });
 
   filterStatus.addEventListener("change", renderRounds);

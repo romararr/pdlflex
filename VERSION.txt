@@ -1,0 +1,3 @@
+PadelFlex Pro v4.1
+Feature build: Extra Match + Adaptive Leaderboard Weight
+Build date: 2026-07-28

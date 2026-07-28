@@ -58,6 +58,18 @@
     session.updatedAt = new Date().toISOString();
   }
 
+  function ensureTournamentWritable(session) {
+    if (session.status === "archived") {
+      throw new Error("Turnamen berada di arsip. Pulihkan terlebih dahulu.");
+    }
+
+    if (session.status === "completed") {
+      throw new Error(
+        "Turnamen sudah selesai. Buka kembali turnamen dari leaderboard untuk melakukan perubahan."
+      );
+    }
+  }
+
   function createDraft(initial = {}) {
     const session = PFStorage.defaultSession();
 
@@ -308,7 +320,10 @@
     const preserved = [];
 
     session.rounds.forEach(round => {
-      if (round.status === "active") {
+      if (
+        round.status === "active" ||
+        round.kind === "manual_extra"
+      ) {
         preserved.push(JSON.parse(JSON.stringify(round)));
         return;
       }
@@ -363,9 +378,9 @@
         0
       ) + 1;
 
-    const generated = PFScheduler.buildRounds(
+    const generated = PFScheduler.buildRecommendedRounds(
       session,
-      recommendation.rounds,
+      recommendation,
       startNumber,
       preserved
     );
@@ -390,6 +405,7 @@
 
   function addPlayer(name) {
     const session = requireSession();
+    ensureTournamentWritable(session);
 
     if (session.setup.randomMode !== "player") {
       throw new Error("Turnamen ini menggunakan mode Per Tim.");
@@ -432,8 +448,71 @@
     return rebuilt;
   }
 
+  function addPlayersBatch(names) {
+    const session = requireSession();
+    ensureTournamentWritable(session);
+
+    if (session.setup.randomMode !== "player") {
+      throw new Error("Turnamen ini menggunakan mode Per Tim.");
+    }
+
+    const existingNames = new Set(
+      session.players.map(player => player.name.toLowerCase())
+    );
+    const batchNames = new Set();
+    const addedNames = [];
+    const skipped = [];
+
+    (Array.isArray(names) ? names : [])
+      .map(name => String(name || "").trim())
+      .filter(Boolean)
+      .forEach(name => {
+        const key = name.toLowerCase();
+
+        if (existingNames.has(key) || batchNames.has(key)) {
+          skipped.push(name);
+          return;
+        }
+
+        batchNames.add(key);
+        addedNames.push(name);
+      });
+
+    if (!addedNames.length) {
+      throw new Error("Tidak ada nama baru yang dapat ditambahkan.");
+    }
+
+    const joinedAtRound = session.submitted
+      ? nextJoinedRound(session)
+      : 1;
+
+    addedNames.forEach(name => {
+      session.players.push({
+        id: PFStorage.uid("player"),
+        name,
+        active: true,
+        joinedAtRound,
+        createdAt: new Date().toISOString()
+      });
+    });
+
+    const rebuilt = session.submitted
+      ? rebuildFutureSchedule(session)
+      : null;
+
+    touch(session);
+    persist();
+
+    return {
+      addedNames,
+      skipped,
+      rebuilt
+    };
+  }
+
   function addTeam(teamName, player1, player2) {
     const session = requireSession();
+    ensureTournamentWritable(session);
 
     if (session.setup.randomMode !== "team") {
       throw new Error("Turnamen ini menggunakan mode Per Player.");
@@ -501,6 +580,7 @@
 
   function setEntityActive(id, active) {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const entity = getEntity(id, session);
 
     if (!entity) {
@@ -522,6 +602,7 @@
 
   function removeEntity(id) {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const entity = getEntity(id, session);
 
     if (!entity) {
@@ -626,6 +707,7 @@
 
   function submitTournament() {
     const session = requireSession();
+    ensureTournamentWritable(session);
 
     validateRoster(session);
 
@@ -635,9 +717,9 @@
       throw new Error(recommendation.reason);
     }
 
-    const generated = PFScheduler.buildRounds(
+    const generated = PFScheduler.buildRecommendedRounds(
       session,
-      recommendation.rounds,
+      recommendation,
       1,
       []
     );
@@ -662,6 +744,7 @@
 
   function activateRound(roundId) {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const target = getRound(roundId, session);
 
     if (!target) {
@@ -709,6 +792,8 @@
     rawValue
   ) {
     const session = requireSession();
+    ensureTournamentWritable(session);
+
     const round = getRound(roundId, session);
     const match = round?.matches.find(item => item.id === matchId);
 
@@ -717,56 +802,100 @@
     }
 
     const text = String(rawValue ?? "").trim();
-
-    pushScoreHistory(session, round, match);
+    const fixedScore = session.setup.scoreMode === "fixed";
 
     if (text === "") {
-      if (side === "A") match.scoreA = "";
-      else match.scoreB = "";
+      const noChange = fixedScore
+        ? (
+            match.scoreA === "" &&
+            match.scoreB === "" &&
+            !match.completed
+          )
+        : (
+            (side === "A" ? match.scoreA : match.scoreB) === "" &&
+            !match.completed
+          );
+
+      if (noChange) return match;
+
+      pushScoreHistory(session, round, match);
+
+      if (fixedScore) {
+        match.scoreA = "";
+        match.scoreB = "";
+      } else if (side === "A") {
+        match.scoreA = "";
+      } else {
+        match.scoreB = "";
+      }
 
       match.completed = false;
-      match.status =
-        round.status === "active"
-          ? "active"
-          : "scheduled";
     } else {
       const value = Number(text);
 
       if (!Number.isFinite(value) || value < 0) {
-        session.scoreHistory.pop();
         throw new Error("Skor tidak valid.");
       }
 
-      if (session.setup.scoreMode === "fixed") {
+      if (!Number.isInteger(value)) {
+        throw new Error("Skor harus berupa angka bulat.");
+      }
+
+      if (fixedScore) {
         const total = Number(session.setup.pointsTotal);
 
         if (value > total) {
-          session.scoreHistory.pop();
           throw new Error(`Skor maksimal ${total}.`);
         }
 
-        if (side === "A") {
-          match.scoreA = value;
-          match.scoreB = total - value;
-        } else {
-          match.scoreB = value;
-          match.scoreA = total - value;
+        const nextScoreA = side === "A"
+          ? value
+          : total - value;
+        const nextScoreB = side === "A"
+          ? total - value
+          : value;
+
+        if (
+          match.scoreA === nextScoreA &&
+          match.scoreB === nextScoreB &&
+          match.completed
+        ) {
+          return match;
         }
 
+        pushScoreHistory(session, round, match);
+        match.scoreA = nextScoreA;
+        match.scoreB = nextScoreB;
         match.completed = true;
       } else {
-        if (side === "A") match.scoreA = value;
-        else match.scoreB = value;
+        const nextScoreA = side === "A" ? value : match.scoreA;
+        const nextScoreB = side === "B" ? value : match.scoreB;
+        const nextCompleted =
+          nextScoreA !== "" &&
+          nextScoreB !== "";
 
-        match.completed =
-          match.scoreA !== "" &&
-          match.scoreB !== "";
+        if (
+          match.scoreA === nextScoreA &&
+          match.scoreB === nextScoreB &&
+          match.completed === nextCompleted
+        ) {
+          return match;
+        }
+
+        pushScoreHistory(session, round, match);
+        match.scoreA = nextScoreA;
+        match.scoreB = nextScoreB;
+        match.completed = nextCompleted;
       }
-
-      match.status = match.completed
-        ? "completed"
-        : "active";
     }
+
+    match.status = match.completed
+      ? "completed"
+      : (
+          round.id === session.activeRoundId
+            ? "active"
+            : "scheduled"
+        );
 
     if (
       round.matches.length &&
@@ -775,6 +904,8 @@
       round.status = "completed";
     } else if (round.id === session.activeRoundId) {
       round.status = "active";
+    } else {
+      round.status = "scheduled";
     }
 
     touch(session);
@@ -785,6 +916,7 @@
 
   function undoLastScore() {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const history = session.scoreHistory.pop();
 
     if (!history) {
@@ -818,6 +950,7 @@
 
   function reopenMatch(roundId, matchId) {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const round = getRound(roundId, session);
     const match = round?.matches.find(item => item.id === matchId);
 
@@ -837,6 +970,7 @@
 
   function startNextRound() {
     const session = requireSession();
+    ensureTournamentWritable(session);
     const active = getActiveRound(session);
 
     if (
@@ -918,6 +1052,283 @@
     return session;
   }
 
+
+  function getCompensationPerMissed(
+    session = requireSession()
+  ) {
+    return session.setup.scoreMode === "fixed"
+      ? Math.floor(Number(session.setup.pointsTotal) / 2)
+      : 1.5;
+  }
+
+  function shuffle(items) {
+    const result = [...items];
+
+    for (let index = result.length - 1; index > 0; index--) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [result[index], result[randomIndex]] =
+        [result[randomIndex], result[index]];
+    }
+
+    return result;
+  }
+
+  function suggestManualMatchParticipants(
+    session = requireSession()
+  ) {
+    ensureTournamentWritable(session);
+
+    if (!session.submitted) {
+      throw new Error(
+        "Submit turnamen terlebih dahulu sebelum menambah match."
+      );
+    }
+
+    const required =
+      session.setup.randomMode === "team"
+        ? 2
+        : 4;
+
+    const activeEntities = getEntities(session);
+
+    if (activeEntities.length < required) {
+      throw new Error(
+        session.setup.randomMode === "team"
+          ? "Minimal 2 tim aktif."
+          : "Minimal 4 pemain aktif."
+      );
+    }
+
+    const stats = computeStats(session).stats;
+    const plannedCounts = new Map(
+      activeEntities.map(entity => [entity.id, 0])
+    );
+
+    session.rounds.forEach(round => {
+      round.matches.forEach(match => {
+        PFScheduler
+          .matchEntityIds(session, match)
+          .forEach(id => {
+            if (plannedCounts.has(id)) {
+              plannedCounts.set(
+                id,
+                plannedCounts.get(id) + 1
+              );
+            }
+          });
+      });
+    });
+
+    const grouped = new Map();
+
+    activeEntities.forEach(entity => {
+      const played = stats[entity.id]?.played || 0;
+      const planned = plannedCounts.get(entity.id) || 0;
+      const groupKey = `${played}|${planned}`;
+
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
+          played,
+          planned,
+          entities: []
+        });
+      }
+
+      grouped.get(groupKey).entities.push(entity);
+    });
+
+    const selected = [];
+
+    [...grouped.values()]
+      .sort((a, b) =>
+        a.played - b.played ||
+        a.planned - b.planned
+      )
+      .forEach(group => {
+        if (selected.length >= required) return;
+
+        shuffle(group.entities).forEach(entity => {
+          if (selected.length < required) {
+            selected.push(entity.id);
+          }
+        });
+      });
+
+    return selected;
+  }
+
+  function addManualMatch(
+    participantIds,
+    options = {}
+  ) {
+    const session = requireSession();
+    ensureTournamentWritable(session);
+
+    if (!session.submitted) {
+      throw new Error(
+        "Turnamen belum disubmit."
+      );
+    }
+
+    const required =
+      session.setup.randomMode === "team"
+        ? 2
+        : 4;
+
+    const ids = Array.isArray(participantIds)
+      ? participantIds.filter(Boolean)
+      : [];
+
+    if (ids.length !== required) {
+      throw new Error(
+        session.setup.randomMode === "team"
+          ? "Pilih tepat 2 tim."
+          : "Pilih tepat 4 pemain."
+      );
+    }
+
+    if (new Set(ids).size !== required) {
+      throw new Error("Peserta dalam satu match tidak boleh duplikat.");
+    }
+
+    const activeIds = new Set(
+      getEntities(session).map(entity => entity.id)
+    );
+
+    const invalid = ids.find(id => !activeIds.has(id));
+
+    if (invalid) {
+      throw new Error(
+        "Semua peserta match tambahan harus berstatus aktif."
+      );
+    }
+
+    const maximumCourt = Math.max(
+      1,
+      Number(session.setup.courtCount)
+    );
+
+    const court = Math.min(
+      maximumCourt,
+      Math.max(1, Number(options.court || 1))
+    );
+
+    const roundNumber = session.rounds.reduce(
+      (maximum, round) =>
+        Math.max(maximum, Number(round.number) || 0),
+      0
+    ) + 1;
+
+    let teamA;
+    let teamB;
+
+    if (session.setup.randomMode === "team") {
+      teamA = [ids[0]];
+      teamB = [ids[1]];
+    } else {
+      const randomized = shuffle(ids);
+      teamA = randomized.slice(0, 2);
+      teamB = randomized.slice(2, 4);
+    }
+
+    const match = {
+      id: PFStorage.uid("match"),
+      court,
+      teamA,
+      teamB,
+      scoreA: "",
+      scoreB: "",
+      completed: false,
+      status: "scheduled",
+      isManualExtra: true,
+      weightMode: "auto_compensation",
+      createdAt: new Date().toISOString()
+    };
+
+    const round = {
+      id: PFStorage.uid("round"),
+      number: roundNumber,
+      status: "scheduled",
+      kind: "manual_extra",
+      label: String(options.label || "Match Tambahan").trim() ||
+        "Match Tambahan",
+      createdAt: new Date().toISOString(),
+      matches: [match],
+      resting: getEntities(session)
+        .filter(entity => !ids.includes(entity.id))
+        .map(entity => entity.id)
+    };
+
+    session.rounds.push(round);
+
+    if (Boolean(options.activateNow)) {
+      activateRoundInternal(session, round);
+    }
+
+    touch(session);
+    persist();
+
+    return {
+      round,
+      match,
+      compensationPerMissed:
+        getCompensationPerMissed(session)
+    };
+  }
+
+  function removeManualMatch(
+    roundId,
+    matchId
+  ) {
+    const session = requireSession();
+    ensureTournamentWritable(session);
+
+    const round = getRound(roundId, session);
+    const match = round?.matches.find(
+      item => item.id === matchId
+    );
+
+    if (
+      !round ||
+      !match ||
+      !match.isManualExtra ||
+      round.kind !== "manual_extra"
+    ) {
+      throw new Error(
+        "Match tambahan tidak ditemukan."
+      );
+    }
+
+    if (match.completed) {
+      throw new Error(
+        "Match tambahan yang sudah memiliki skor tidak dapat dihapus."
+      );
+    }
+
+    session.scoreHistory = session.scoreHistory.filter(
+      item =>
+        item.roundId !== roundId &&
+        item.matchId !== matchId
+    );
+
+    session.rounds = session.rounds.filter(
+      item => item.id !== roundId
+    );
+
+    if (session.activeRoundId === roundId) {
+      session.activeRoundId = null;
+    }
+
+    if (session.submitted) {
+      rebuildFutureSchedule(session);
+    }
+
+    touch(session);
+    persist();
+
+    return true;
+  }
+
   function computeStats(session = requireSession()) {
     const entities =
       session.setup.randomMode === "team"
@@ -992,9 +1403,7 @@
     );
 
     const compensationPerMissed =
-      session.setup.scoreMode === "fixed"
-        ? Math.floor(Number(session.setup.pointsTotal) / 2)
-        : 0;
+      getCompensationPerMissed(session);
 
     values.forEach(item => {
       item.diff = item.scored - item.conceded;
@@ -1013,7 +1422,7 @@
       item.points =
         session.setup.scoreMode === "fixed"
           ? item.scored + item.compensation
-          : item.wins * 3 + item.ties;
+          : item.wins * 3 + item.ties + item.compensation;
     });
 
     const sorted = [...values].sort((a, b) =>
@@ -1122,6 +1531,7 @@
     getNextRound,
     saveSetup,
     addPlayer,
+    addPlayersBatch,
     addTeam,
     setEntityActive,
     removeEntity,
@@ -1136,6 +1546,10 @@
     startNextRound,
     completeTournament,
     reopenTournament,
+    getCompensationPerMissed,
+    suggestManualMatchParticipants,
+    addManualMatch,
+    removeManualMatch,
     computeStats,
     sessionSummary,
     replaceRoot,

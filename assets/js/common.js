@@ -151,34 +151,41 @@
 
   function guard() {
     const page = getPage();
+    window.__pfGuardRedirecting = false;
 
     if (
       ["hub", "settings", "display"].includes(page)
     ) {
-      return;
+      return true;
     }
 
     const session = PFApp.getSelectedSession();
 
     if (!session) {
+      window.__pfGuardRedirecting = true;
       location.href = "index.html";
-      return;
+      return false;
     }
 
     if (
       page !== "setup" &&
       !session.setup.initialized
     ) {
+      window.__pfGuardRedirecting = true;
       location.href = "setup.html";
-      return;
+      return false;
     }
 
     if (
       page === "matches" &&
       !session.submitted
     ) {
+      window.__pfGuardRedirecting = true;
       location.href = "players.html";
+      return false;
     }
+
+    return true;
   }
 
   function registerServiceWorker() {
@@ -195,7 +202,8 @@
   }
 
   function init() {
-    guard();
+    if (!guard()) return;
+
     renderNavigation();
     renderHeader();
     renderSteps();

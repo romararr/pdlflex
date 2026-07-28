@@ -398,52 +398,197 @@
     return entities.map(entity => counts.get(entity.id) || 0);
   }
 
-  function targetFeasible(
-    counts,
-    rounds,
-    slotsPerRound,
-    exactOnly
+  function simulateAdaptivePlan(
+    entities,
+    currentCounts,
+    finalTargets,
+    maxCourts,
+    perCourt,
+    maxRounds
   ) {
-    const entityCount = counts.length;
-    const total =
-      counts.reduce((sum, value) => sum + value, 0) +
-      rounds * slotsPerRound;
+    const participants = entities.map((entity, index) => ({
+      id: entity.id,
+      name: String(entity.name || ""),
+      joinedAtRound: entity.joinedAtRound || 1,
+      current: currentCounts[index],
+      deficit: finalTargets[index] - currentCounts[index]
+    }));
 
-    const low = Math.floor(total / entityCount);
-    const high = Math.ceil(total / entityCount);
-    const highCount = total % entityCount;
-
-    if (exactOnly && highCount !== 0) return null;
-
-    let forcedHigh = 0;
-    let forcedLow = 0;
-
-    for (const current of counts) {
-      const canLow =
-        current <= low &&
-        low <= current + rounds;
-
-      const canHigh =
-        current <= high &&
-        high <= current + rounds;
-
-      if (!canLow && !canHigh) return null;
-      if (!canLow && canHigh) forcedHigh++;
-      if (canLow && !canHigh) forcedLow++;
-    }
-
-    if (
-      forcedHigh > highCount ||
-      highCount > entityCount - forcedLow
-    ) {
+    if (participants.some(item => item.deficit < 0)) {
       return null;
     }
 
-    return {
-      low,
-      high,
-      exact: low === high
-    };
+    const totalAppearances = participants.reduce(
+      (total, item) => total + item.deficit,
+      0
+    );
+
+    if (totalAppearances === 0) return [];
+    if (totalAppearances % perCourt !== 0) return null;
+
+    const totalMatches = totalAppearances / perCourt;
+    const maximumDeficit = Math.max(
+      ...participants.map(item => item.deficit),
+      0
+    );
+
+    const minimumRounds = Math.max(
+      maximumDeficit,
+      Math.ceil(totalMatches / maxCourts)
+    );
+
+    const maximumRounds = Math.min(
+      totalMatches,
+      maxRounds
+    );
+
+    for (
+      let roundCount = minimumRounds;
+      roundCount <= maximumRounds;
+      roundCount++
+    ) {
+      const baseMatches = Math.floor(totalMatches / roundCount);
+      const extraRounds = totalMatches % roundCount;
+
+      if (
+        baseMatches < 1 ||
+        baseMatches > maxCourts ||
+        (
+          extraRounds > 0 &&
+          baseMatches + 1 > maxCourts
+        )
+      ) {
+        continue;
+      }
+
+      const capacities = Array.from(
+        { length: roundCount },
+        (_, index) =>
+          (baseMatches + (index < extraRounds ? 1 : 0)) * perCourt
+      );
+
+      const plan = Array.from(
+        { length: roundCount },
+        () => []
+      );
+
+      const orderedParticipants = [...participants]
+        .filter(item => item.deficit > 0)
+        .sort((a, b) =>
+          b.deficit - a.deficit ||
+          a.current - b.current ||
+          b.joinedAtRound - a.joinedAtRound ||
+          a.name.localeCompare(b.name)
+        );
+
+      let failed = false;
+
+      for (const participant of orderedParticipants) {
+        const availableRounds = capacities
+          .map((capacity, index) => ({
+            index,
+            capacity,
+            size: plan[index].length
+          }))
+          .filter(item => item.capacity > 0)
+          .sort((a, b) =>
+            b.capacity - a.capacity ||
+            a.size - b.size ||
+            a.index - b.index
+          );
+
+        if (availableRounds.length < participant.deficit) {
+          failed = true;
+          break;
+        }
+
+        availableRounds
+          .slice(0, participant.deficit)
+          .forEach(item => {
+            plan[item.index].push(participant.id);
+            capacities[item.index]--;
+          });
+      }
+
+      if (
+        !failed &&
+        capacities.every(capacity => capacity === 0) &&
+        plan.every(selected =>
+          selected.length >= perCourt &&
+          selected.length % perCourt === 0 &&
+          new Set(selected).size === selected.length
+        )
+      ) {
+        return plan;
+      }
+    }
+
+    return null;
+  }
+
+  function buildRecommendedRounds(
+    session,
+    recommendation,
+    startNumber,
+    preservedRounds
+  ) {
+    if (
+      !recommendation ||
+      !recommendation.available ||
+      !Array.isArray(recommendation.plan)
+    ) {
+      return [];
+    }
+
+    const entities = getEntities(session);
+    const entityMap = new Map(
+      entities.map(entity => [entity.id, entity])
+    );
+    const perCourt = entitiesPerCourt(session);
+    const metrics = createMetrics(session, preservedRounds);
+    const rounds = [];
+
+    recommendation.plan.forEach((selectedIds, offset) => {
+      const number = startNumber + offset;
+      const selected = selectedIds
+        .map(id => entityMap.get(id))
+        .filter(Boolean);
+      const courts = Math.floor(selected.length / perCourt);
+
+      if (courts < 1) return;
+
+      const matches =
+        session.setup.randomMode === "team"
+          ? buildTeamMatches(
+              selected,
+              courts,
+              number,
+              metrics
+            )
+          : buildPlayerMatches(
+              selected,
+              courts,
+              number,
+              metrics
+            );
+
+      const playing = matches.flatMap(match =>
+        matchEntityIds(session, match)
+      );
+
+      rounds.push({
+        id: PFStorage.uid("round"),
+        number,
+        status: "scheduled",
+        createdAt: new Date().toISOString(),
+        matches,
+        resting: entities
+          .filter(entity => !playing.includes(entity.id))
+          .map(entity => entity.id)
+      });
+    });
+
+    return rounds;
   }
 
   function recommend(
@@ -452,10 +597,10 @@
     options = {}
   ) {
     const entities = getEntities(session);
-    const courts = usableCourts(session);
+    const maxCourts = usableCourts(session);
     const perCourt = entitiesPerCourt(session);
 
-    if (entities.length < perCourt || courts < 1) {
+    if (entities.length < perCourt || maxCourts < 1) {
       return {
         available: false,
         reason:
@@ -465,14 +610,13 @@
       };
     }
 
-    const slots = courts * perCourt;
-    const counts = countAppearances(
+    const currentCounts = countAppearances(
       session,
       entities,
       preservedRounds
     );
 
-    const currentMaximum = Math.max(...counts, 0);
+    const currentMaximum = Math.max(...currentCounts, 0);
     const minimumTarget = Math.max(
       Number(options.minimumGames || session.setup.minimumGames || 4),
       currentMaximum
@@ -483,59 +627,109 @@
       Number(options.maxRounds || 80)
     );
 
-    let compact = null;
+    const maxSlots = maxCourts * perCourt;
+    let best = null;
 
-    for (let rounds = 1; rounds <= maxRounds; rounds++) {
-      const candidate = targetFeasible(
-        counts,
-        rounds,
-        slots,
-        false
-      );
+    for (
+      let baseTarget = minimumTarget;
+      baseTarget <= minimumTarget + maxRounds;
+      baseTarget++
+    ) {
+      const targetPriority = entities
+        .map((entity, index) => ({
+          index,
+          current: currentCounts[index],
+          joinedAtRound: entity.joinedAtRound || 1,
+          name: String(entity.name || "")
+        }))
+        .sort((a, b) =>
+          a.current - b.current ||
+          b.joinedAtRound - a.joinedAtRound ||
+          a.name.localeCompare(b.name)
+        );
 
-      if (
-        candidate &&
-        candidate.low >= minimumTarget &&
-        !compact
-      ) {
-        compact = { rounds, ...candidate };
-      }
+      for (let highCount = 0; highCount < entities.length; highCount++) {
+        const finalTargets = entities.map(() => baseTarget);
 
-      const exact = targetFeasible(
-        counts,
-        rounds,
-        slots,
-        true
-      );
+        for (let index = 0; index < highCount; index++) {
+          finalTargets[targetPriority[index].index] = baseTarget + 1;
+        }
 
-      if (exact && exact.low >= minimumTarget) {
-        return {
+        const totalDeficit = finalTargets.reduce(
+          (total, target, index) =>
+            total + target - currentCounts[index],
+          0
+        );
+
+        if (totalDeficit < 0 || totalDeficit % perCourt !== 0) {
+          continue;
+        }
+
+        const plan = simulateAdaptivePlan(
+          entities,
+          currentCounts,
+          finalTargets,
+          maxCourts,
+          perCourt,
+          maxRounds
+        );
+
+        if (!plan) continue;
+
+        const courtPattern = plan.map(
+          selectedIds => selectedIds.length / perCourt
+        );
+
+        const candidate = {
           available: true,
-          rounds,
-          exact: true,
-          minGames: exact.low,
-          maxGames: exact.high,
+          rounds: plan.length,
+          exact: highCount === 0,
+          minGames: baseTarget,
+          maxGames: highCount === 0
+            ? baseTarget
+            : baseTarget + 1,
           entityCount: entities.length,
-          courts,
-          slotsPerRound: slots,
-          currentCounts: counts
+          courts: maxCourts,
+          minCourts: courtPattern.length
+            ? Math.min(...courtPattern)
+            : 0,
+          maxCourtsUsed: courtPattern.length
+            ? Math.max(...courtPattern)
+            : 0,
+          variableCourts:
+            new Set(courtPattern).size > 1 ||
+            courtPattern.some(value => value !== maxCourts),
+          courtPattern,
+          slotsPerRound: maxSlots,
+          currentCounts,
+          finalTargets,
+          plan
         };
+
+        if (
+          !best ||
+          candidate.rounds < best.rounds ||
+          (
+            candidate.rounds === best.rounds &&
+            candidate.maxGames < best.maxGames
+          ) ||
+          (
+            candidate.rounds === best.rounds &&
+            candidate.maxGames === best.maxGames &&
+            candidate.exact &&
+            !best.exact
+          )
+        ) {
+          best = candidate;
+        }
+      }
+
+      if (best && best.maxGames <= baseTarget + 1) {
+        break;
       }
     }
 
-    if (compact) {
-      return {
-        available: true,
-        rounds: compact.rounds,
-        exact: false,
-        minGames: compact.low,
-        maxGames: compact.high,
-        entityCount: entities.length,
-        courts,
-        slotsPerRound: slots,
-        currentCounts: counts
-      };
-    }
+    if (best) return best;
 
     return {
       available: false,
@@ -579,6 +773,7 @@
     usableCourts,
     matchEntityIds,
     buildRounds,
+    buildRecommendedRounds,
     recommend,
     fairness
   };

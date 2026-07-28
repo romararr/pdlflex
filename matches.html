@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <meta name="description" content="PadelFlex Pro v4 - padel tournament manager tanpa database">
+  <meta name="description" content="PadelFlex Pro v4.1 - padel tournament manager tanpa database">
   <title>Operator Pertandingan — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
@@ -17,7 +17,7 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4 · Local-first</small>
+          <small>Version 4.1 · Local-first</small>
         </span>
       </a>
 
@@ -104,6 +104,66 @@
   </div>
 </div>
 
+
+<section class="card extra-match-builder" id="extraMatchSection" style="margin-top:18px">
+  <div class="card-header">
+    <div>
+      <h2>Tambah Match di Tengah Turnamen</h2>
+      <div class="list-meta">
+        Pilih peserta satu per satu atau isi otomatis dengan random yang
+        memprioritaskan peserta dengan jumlah main paling sedikit.
+      </div>
+    </div>
+    <span class="badge">Match Tambahan</span>
+  </div>
+
+  <div class="card-body">
+    <div class="info" id="extraMatchWeightInfo" style="margin-bottom:14px">
+      Bobot leaderboard dihitung otomatis.
+    </div>
+
+    <div class="manual-player-slots" id="manualPlayerSlots"></div>
+
+    <div class="form-grid" style="margin-top:14px">
+      <div class="field">
+        <label for="extraMatchCourt">Court</label>
+        <select class="select" id="extraMatchCourt"></select>
+      </div>
+
+      <div class="field">
+        <label for="extraMatchLabel">Label match</label>
+        <input
+          class="input"
+          id="extraMatchLabel"
+          maxlength="45"
+          value="Match Tambahan">
+      </div>
+    </div>
+
+    <label class="extra-activate-option">
+      <input type="checkbox" id="activateExtraMatch">
+      <span>
+        Aktifkan langsung setelah ditambahkan. Ronde aktif sekarang akan
+        kembali menjadi menunggu tanpa kehilangan skor.
+      </span>
+    </label>
+
+    <div class="extra-match-actions">
+      <button class="btn btn-soft" id="randomExtraPlayers" type="button">
+        🎲 Random Peserta
+      </button>
+
+      <button class="btn btn-secondary" id="clearExtraPlayers" type="button">
+        Bersihkan
+      </button>
+
+      <button class="btn btn-primary" id="createExtraMatch" type="button">
+        ＋ Tambahkan Match
+      </button>
+    </div>
+  </div>
+</section>
+
 <section class="card" id="matchChooserSection" style="margin-top:18px">
   <div class="card-header">
     <div>
@@ -155,6 +215,10 @@
   <div class="sticky-buttons">
     <button class="btn btn-secondary btn-sm" id="addParticipant">
       ＋ Peserta
+    </button>
+
+    <button class="btn btn-soft btn-sm" id="addExtraMatch">
+      ＋ Match
     </button>
 
     <button class="btn btn-soft btn-sm" id="undoScore">
