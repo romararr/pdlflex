@@ -1,4 +1,4 @@
-const CACHE_NAME = "padelflex-pro-v4-4-cache-1";
+const CACHE_NAME = "padelflex-pro-v4-5-cache-1";
 const APP_FILES = [
   "./",
   "./index.html",

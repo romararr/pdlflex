@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <meta name="description" content="PadelFlex Pro v4.4 - padel tournament manager tanpa database">
+  <meta name="description" content="PadelFlex Pro v4.5 - compact padel tournament operator">
   <title>Operator Pertandingan — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
@@ -17,38 +17,24 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4.4 · Stable QA</small>
+          <small>Version 4.5 · Compact Operator</small>
         </span>
       </a>
 
-      <nav class="nav"><a class="nav-link" data-nav="hub" href="index.html">
-          <span class="nav-icon">⌂</span>Turnamen
-        </a>
-<a class="nav-link" data-nav="setup" href="setup.html">
-          <span class="nav-icon">⚙</span>Init
-        </a>
-<a class="nav-link" data-nav="players" href="players.html">
-          <span class="nav-icon">👥</span>Peserta
-        </a>
-<a class="nav-link" data-nav="matches" href="matches.html">
-          <span class="nav-icon">🎾</span>Pertandingan
-        </a>
-<a class="nav-link" data-nav="leaderboard" href="leaderboard.html">
-          <span class="nav-icon">🏆</span>Leaderboard
-        </a>
-<a class="nav-link" data-nav="display" href="display.html">
-          <span class="nav-icon">▣</span>Display TV
-        </a>
-<a class="nav-link" data-nav="settings" href="settings.html">
-          <span class="nav-icon">☷</span>Settings
-        </a></nav>
+      <nav class="nav">
+        <a class="nav-link" data-nav="hub" href="index.html"><span class="nav-icon">⌂</span>Turnamen</a>
+        <a class="nav-link" data-nav="setup" href="setup.html"><span class="nav-icon">⚙</span>Init</a>
+        <a class="nav-link" data-nav="players" href="players.html"><span class="nav-icon">👥</span>Peserta</a>
+        <a class="nav-link" data-nav="matches" href="matches.html"><span class="nav-icon">🎾</span>Pertandingan</a>
+        <a class="nav-link" data-nav="leaderboard" href="leaderboard.html"><span class="nav-icon">🏆</span>Leaderboard</a>
+        <a class="nav-link" data-nav="display" href="display.html"><span class="nav-icon">▣</span>Display TV</a>
+        <a class="nav-link" data-nav="settings" href="settings.html"><span class="nav-icon">☷</span>Settings</a>
+      </nav>
 
       <div class="sidebar-footer">
         <div class="local-note">
-          <strong style="display:block;color:#fff;margin-bottom:4px">
-            Tanpa database
-          </strong>
-          Multi-turnamen disimpan otomatis di browser dan dapat dibackup ke JSON.
+          <strong style="display:block;color:#fff;margin-bottom:4px">Tanpa database</strong>
+          Data tersimpan otomatis di browser.
         </div>
       </div>
     </aside>
@@ -57,210 +43,149 @@
       <header class="topbar">
         <div class="topbar-copy">
           <strong id="topbarTitle">PadelFlex Pro</strong>
-          <span id="topbarSubtitle">Multi-turnamen · tanpa database</span>
+          <span id="topbarSubtitle">Operator pertandingan</span>
         </div>
-
         <div class="autosave">● <span>Tersimpan otomatis</span></div>
       </header>
 
-      <main class="page">
-        <nav class="stepper" aria-label="Alur turnamen"><a class="step" data-step="1" href="setup.html">
-              <span>Langkah 1</span>
-              <strong>Init</strong>
-            </a><a class="step" data-step="2" href="players.html">
-              <span>Langkah 2</span>
-              <strong>Peserta</strong>
-            </a><a class="step" data-step="3" href="players.html">
-              <span>Langkah 3</span>
-              <strong>Submit</strong>
-            </a><a class="step" data-step="4" href="matches.html">
-              <span>Langkah 4</span>
-              <strong>Pertandingan</strong>
-            </a><a class="step" data-step="5" href="leaderboard.html">
-              <span>Langkah 5</span>
-              <strong>Leaderboard</strong>
-            </a></nav>
+      <main class="page operator-page">
+        <section class="operator-command">
+          <div class="operator-command-copy">
+            <div class="eyebrow">Operator Pertandingan</div>
+            <h1>Kelola Match</h1>
+            <p>Fokus ke match aktif, antrean berikutnya, dan hasil yang sudah selesai.</p>
+          </div>
 
-        <div class="heading">
-          <div>
-            <div class="eyebrow">Langkah 4</div>
-            <h1>Operator Pertandingan</h1>
-            <p>Pilih match yang ready, input skor, koreksi hasil, tambah peserta, dan pantau fairness.</p>
+          <div class="operator-command-actions">
+            <button class="btn btn-primary" id="addExtraMatch" type="button">＋ Tambah Match</button>
+            <a class="btn btn-secondary" href="players.html">＋ Peserta</a>
+            <a class="btn btn-secondary" href="display.html">Display TV</a>
+            <a class="btn btn-soft" href="leaderboard.html">Leaderboard</a>
+          </div>
+        </section>
+
+        <section class="operator-overview">
+          <div class="operator-metrics" id="matchMetrics"></div>
+          <div class="operator-fairness">
+            <div class="operator-fairness-copy">
+              <strong>Kemerataan roster aktif</strong>
+              <span id="fairnessLabel">0%</span>
+            </div>
+            <div class="fairness-meter">
+              <div class="fairness-bar" id="fairnessBar"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card active-match-card">
+          <div class="card-header compact-card-header">
+            <div>
+              <h2>Match Aktif</h2>
+              <div class="list-meta" id="activeMatchSubtitle">Belum ada pertandingan aktif.</div>
+            </div>
+            <span class="badge" id="activeMatchBadge">Menunggu</span>
+          </div>
+          <div class="card-body compact-card-body" id="activeMatchContainer"></div>
+        </section>
+
+        <section class="card" id="matchChooserSection" style="margin-top:14px">
+          <div class="card-header compact-card-header">
+            <div>
+              <h2>Antrean Berikutnya</h2>
+              <div class="list-meta">Yang sudah cukup istirahat ditempatkan lebih atas.</div>
+            </div>
+            <span class="badge" id="pendingCount">0 menunggu</span>
+          </div>
+          <div class="card-body compact-card-body">
+            <div class="compact-match-queue" id="matchChooser"></div>
+          </div>
+        </section>
+
+        <section class="card match-history-card" style="margin-top:14px">
+          <div class="card-header compact-card-header history-header">
+            <div>
+              <h2>Riwayat & Jadwal</h2>
+              <div class="list-meta">Default hanya menampilkan match selesai agar halaman tetap ringkas.</div>
+            </div>
+
+            <div class="history-tools">
+              <input class="input input-compact" id="matchSearch" placeholder="Cari pemain / tim">
+              <select class="select select-compact" id="matchStatusFilter">
+                <option value="completed" selected>Selesai</option>
+                <option value="pending">Menunggu</option>
+                <option value="active">Aktif</option>
+                <option value="all">Semua</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="card-body compact-card-body">
+            <div id="roundsContainer"></div>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
+
+  <div class="compact-actionbar" id="stickyActions">
+    <div class="compact-action-copy">
+      <strong id="stickyTitle">Kontrol turnamen</strong>
+      <small id="stickySubtitle">Pilih pertandingan berikutnya.</small>
+    </div>
+
+    <div class="compact-action-buttons">
+      <button class="btn btn-soft btn-sm" id="undoScore">↶ Undo</button>
+      <button class="btn btn-success btn-sm" id="completeTournament">Selesaikan</button>
+      <a class="btn btn-primary btn-sm" href="leaderboard.html">Leaderboard</a>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="extraMatchModal" aria-hidden="true">
+    <div class="modal-dialog match-modal" role="dialog" aria-modal="true" aria-labelledby="extraMatchModalTitle">
+      <div class="modal-header">
+        <div>
+          <div class="eyebrow">Manual Match</div>
+          <h2 id="extraMatchModalTitle">Tambah Pertandingan</h2>
+          <p>Pilih peserta sendiri atau gunakan random rest-aware.</p>
+        </div>
+        <button class="modal-close" id="closeExtraMatchModal" type="button" aria-label="Tutup">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="info modal-info" id="extraMatchWeightInfo">
+          Bobot leaderboard dihitung otomatis.
+        </div>
+
+        <div class="manual-player-slots modal-player-slots" id="manualPlayerSlots"></div>
+
+        <div class="rest-readiness" id="extraMatchRestInfo"></div>
+
+        <div class="form-grid modal-form-grid">
+          <div class="field">
+            <label for="extraMatchCourt">Court</label>
+            <select class="select" id="extraMatchCourt"></select>
+          </div>
+
+          <div class="field">
+            <label for="extraMatchLabel">Label match</label>
+            <input class="input" id="extraMatchLabel" maxlength="45" value="Match Manual">
           </div>
         </div>
 
-
-<div class="grid grid-4" id="matchMetrics"></div>
-
-<div class="card" style="margin-top:18px">
-  <div class="card-body">
-    <div class="fairness">
-      <strong style="font-size:12px">Kemerataan jadwal</strong>
-      <div class="fairness-meter">
-        <div class="fairness-bar" id="fairnessBar"></div>
-      </div>
-      <span class="fairness-value" id="fairnessLabel">0%</span>
-    </div>
-  </div>
-</div>
-
-
-<section class="card extra-match-builder" id="extraMatchSection" style="margin-top:18px">
-  <div class="card-header">
-    <div>
-      <h2>Tambah Match Manual</h2>
-      <div class="list-meta">
-        Turnamen boleh dimulai dari 0 match. Pilih peserta satu per satu atau
-        gunakan random rest-aware yang memprioritaskan pemain paling segar dan
-        jumlah main paling sedikit.
-      </div>
-    </div>
-    <span class="badge">Manual Match</span>
-  </div>
-
-  <div class="card-body">
-    <div class="info" id="extraMatchWeightInfo" style="margin-bottom:14px">
-      Bobot leaderboard dihitung otomatis.
-    </div>
-
-    <div class="manual-player-slots" id="manualPlayerSlots"></div>
-
-    <div
-      class="rest-readiness"
-      id="extraMatchRestInfo"
-      style="margin-top:12px">
-    </div>
-
-    <div class="form-grid" style="margin-top:14px">
-      <div class="field">
-        <label for="extraMatchCourt">Court</label>
-        <select class="select" id="extraMatchCourt"></select>
+        <label class="extra-activate-option modal-activate-option">
+          <input type="checkbox" id="activateExtraMatch">
+          <span>Aktifkan langsung setelah match dibuat.</span>
+        </label>
       </div>
 
-      <div class="field">
-        <label for="extraMatchLabel">Label match</label>
-        <input
-          class="input"
-          id="extraMatchLabel"
-          maxlength="45"
-          value="Match Manual">
+      <div class="modal-footer">
+        <button class="btn btn-soft" id="randomExtraPlayers" type="button">🎲 Random</button>
+        <button class="btn btn-secondary" id="clearExtraPlayers" type="button">Bersihkan</button>
+        <span class="modal-footer-spacer"></span>
+        <button class="btn btn-secondary" id="cancelExtraMatchModal" type="button">Batal</button>
+        <button class="btn btn-primary" id="createExtraMatch" type="button">＋ Tambahkan Match</button>
       </div>
     </div>
-
-    <label class="extra-activate-option">
-      <input type="checkbox" id="activateExtraMatch">
-      <span>
-        Aktifkan langsung setelah ditambahkan. Ronde aktif sekarang akan
-        kembali menjadi menunggu tanpa kehilangan skor.
-      </span>
-    </label>
-
-    <div class="extra-match-actions">
-      <button class="btn btn-soft" id="randomExtraPlayers" type="button">
-        🎲 Random Peserta
-      </button>
-
-      <button class="btn btn-secondary" id="clearExtraPlayers" type="button">
-        Bersihkan
-      </button>
-
-      <button class="btn btn-primary" id="createExtraMatch" type="button">
-        ＋ Tambahkan Match
-      </button>
-    </div>
-  </div>
-</section>
-
-<section class="card" id="matchChooserSection" style="margin-top:18px">
-  <div class="card-header">
-    <div>
-      <h2>Pilih Pertandingan</h2>
-      <div class="list-meta">
-        Match dengan badge Siap Istirahat direkomendasikan lebih dulu.
-        Match yang memakai pemain baru selesai main tetap bisa dipaksa bila diperlukan.
-      </div>
-    </div>
-    <span class="badge" id="pendingCount">0 menunggu</span>
-  </div>
-
-  <div class="card-body">
-    <div class="match-chooser" id="matchChooser"></div>
-  </div>
-</section>
-
-<div class="card" style="margin-top:18px">
-  <div class="card-body">
-    <div class="form-grid">
-      <div class="field">
-        <label for="matchSearch">Cari pemain atau tim</label>
-        <input
-          class="input"
-          id="matchSearch"
-          placeholder="Ketik nama peserta">
-      </div>
-
-      <div class="field">
-        <label for="matchStatusFilter">Filter ronde</label>
-        <select class="select" id="matchStatusFilter">
-          <option value="all">Semua ronde</option>
-          <option value="active">Aktif</option>
-          <option value="pending">Menunggu</option>
-          <option value="completed">Selesai</option>
-        </select>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="roundsContainer" style="margin-top:18px"></div>
-
-<div class="sticky-actions" id="stickyActions">
-  <div class="sticky-copy">
-    <strong id="stickyTitle">Kontrol turnamen</strong>
-    <small id="stickySubtitle">Pilih pertandingan yang sudah siap.</small>
-  </div>
-
-  <div class="sticky-buttons">
-    <button class="btn btn-secondary btn-sm" id="addParticipant">
-      ＋ Peserta
-    </button>
-
-    <button class="btn btn-soft btn-sm" id="addExtraMatch">
-      ＋ Match
-    </button>
-
-    <button class="btn btn-soft btn-sm" id="undoScore">
-      ↶ Undo Skor
-    </button>
-
-    <button class="btn btn-soft btn-sm" id="viewActive">
-      Lihat Aktif
-    </button>
-
-    <button class="btn btn-soft btn-sm" id="chooseMatch">
-      Pilih Match
-    </button>
-
-    <button class="btn btn-success btn-sm hidden" id="nextRound">
-      Ronde Berikutnya
-    </button>
-
-    <button class="btn btn-success btn-sm" id="completeTournament">
-      Selesaikan
-    </button>
-
-    <a class="btn btn-secondary btn-sm" href="display.html">
-      Display TV
-    </a>
-
-    <a class="btn btn-primary btn-sm" href="leaderboard.html">
-      Leaderboard
-    </a>
-  </div>
-</div>
-
-      </main>
-    </section>
   </div>
 
   <div class="toast" id="toast"></div>

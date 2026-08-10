@@ -68,3 +68,20 @@ Service worker aktif saat aplikasi dibuka melalui HTTP/HTTPS. Browser dapat mena
 `localhost`, IP LAN, domain, dan port yang berbeda dianggap origin yang berbeda. Gunakan alamat yang konsisten dan lakukan **Settings → Export Semua JSON** sebelum memindahkan server atau membersihkan data browser.
 
 Lihat `QA_REPORT_V4.4.md` untuk hasil pengujian build ini.
+
+
+## v4.5 Compact Operator
+
+Halaman Pertandingan diringkas:
+
+- stepper besar dihapus dari halaman operator;
+- empat metrik dibuat menjadi mini-stat;
+- fairness digabung ke overview;
+- hanya satu match aktif ditampilkan detail;
+- antrean berikutnya memakai area scroll internal;
+- riwayat default hanya menampilkan match selesai;
+- match selesai tampil sebagai row compact, bukan scoreboard penuh;
+- aksi operator dipadatkan menjadi bar bawah;
+- form Tambah Match Manual dipindahkan ke modal.
+
+Modal dapat ditutup dengan tombol X, Batal, klik backdrop, atau tombol ESC.
