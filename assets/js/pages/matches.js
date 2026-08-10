@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const createExtraMatch = document.getElementById("createExtraMatch");
   const addExtraMatch = document.getElementById("addExtraMatch");
   const extraMatchWeightInfo = document.getElementById("extraMatchWeightInfo");
+  const extraMatchRestInfo = document.getElementById("extraMatchRestInfo");
 
   let extraSelection = [];
 
@@ -67,6 +68,84 @@ document.addEventListener("DOMContentLoaded", function () {
       : "Player";
   }
 
+
+  function participantRestLabel(entityId) {
+    const current = session();
+    const actual = PFApp.getParticipantRestStatus(
+      [entityId],
+      current
+    );
+
+    const planned = PFApp.getPlannedRestStatus(
+      [entityId],
+      current
+    );
+
+    const item = actual.items[0];
+    const plannedItem = planned.items[0];
+
+    if (
+      (!item || item.neverPlayed) &&
+      (!plannedItem || plannedItem.neverScheduled)
+    ) {
+      return "belum main";
+    }
+
+    if (
+      !actual.ready ||
+      !planned.ready
+    ) {
+      return "urutan terlalu dekat";
+    }
+
+    return "siap";
+  }
+
+  function renderSelectedRestStatus() {
+    const current = session();
+    const ids = extraSelection.filter(Boolean);
+
+    if (ids.length !== extraRequiredCount()) {
+      extraMatchRestInfo.innerHTML = `
+        <span class="badge">Pilih semua peserta</span>
+        <span>
+          Sistem akan mengecek apakah pemain sudah mendapat jeda minimal
+          ${current.setup.minRestRounds ?? 1}.
+        </span>`;
+
+      extraMatchRestInfo.className =
+        "rest-readiness";
+      return;
+    }
+
+    const rest = PFApp.getManualCreationRestStatus(
+      ids,
+      current
+    );
+
+    if (rest.ready) {
+      extraMatchRestInfo.innerHTML = `
+        <span class="badge badge-success">✓ Siap Istirahat</span>
+        <span>
+          Semua peserta memenuhi jeda aktual dan urutan jadwal minimal ${rest.required}.
+        </span>`;
+
+      extraMatchRestInfo.className =
+        "rest-readiness ready";
+      return;
+    }
+
+    extraMatchRestInfo.innerHTML = `
+      <span class="badge badge-warning">⚠ Butuh Istirahat</span>
+      <span>
+        ${PFUI.escapeHtml(rest.tiredNames.join(", "))}
+        terlalu dekat dengan pertandingan sebelumnya atau baru saja bermain.
+      </span>`;
+
+    extraMatchRestInfo.className =
+      "rest-readiness warning";
+  }
+
   function renderExtraMatchBuilder() {
     const current = session();
     const entities = PFApp.getEntities(current);
@@ -89,6 +168,8 @@ document.addEventListener("DOMContentLoaded", function () {
       extraSelection.filter(Boolean)
     );
 
+    const stats = PFApp.computeStats(current).stats;
+
     manualPlayerSlots.innerHTML = extraSelection
       .map((selectedId, index) => `
         <div class="manual-slot">
@@ -110,6 +191,8 @@ document.addEventListener("DOMContentLoaded", function () {
                   ${selected ? "selected" : ""}
                   ${usedElsewhere ? "disabled" : ""}>
                   ${PFUI.escapeHtml(entity.name)}
+                  · G${stats[entity.id]?.played || 0}
+                  · ${PFUI.escapeHtml(participantRestLabel(entity.id))}
                 </option>`;
             }).join("")}
           </select>
@@ -145,13 +228,15 @@ document.addEventListener("DOMContentLoaded", function () {
     extraMatchWeightInfo.innerHTML =
       current.setup.scoreMode === "fixed"
         ? `<strong>Bobot otomatis:</strong>
-           match tambahan memakai sistem total
-           <strong>${current.setup.pointsTotal}</strong>.
-           Peserta yang tertinggal satu game akan mendapat
-           <strong>+${weight}</strong> pada kolom +M.`
+           sistem total <strong>${current.setup.pointsTotal}</strong>,
+           kompensasi <strong>+${weight}</strong> per game tertinggal
+           <strong>sejak pemain bergabung</strong>.
+           Jeda minimal: <strong>${current.setup.minRestRounds ?? 1}</strong>.`
         : `<strong>Bobot otomatis:</strong>
-           menang 3 poin, seri 1 poin, dan peserta yang tertinggal satu game
-           mendapat <strong>+${weight}</strong> poin kompensasi.`;
+           menang 3, seri 1, kalah 0, kompensasi
+           <strong>+${weight}</strong> per game tertinggal
+           <strong>sejak pemain bergabung</strong>.
+           Jeda minimal: <strong>${current.setup.minRestRounds ?? 1}</strong>.`;
 
     createExtraMatch.disabled =
       completed ||
@@ -166,6 +251,8 @@ document.addEventListener("DOMContentLoaded", function () {
     extraMatchLabel.disabled = completed;
     activateExtraMatch.disabled = completed;
 
+    renderSelectedRestStatus();
+
     if (completed) {
       extraMatchWeightInfo.innerHTML =
         `<strong>Turnamen sudah selesai.</strong>
@@ -178,25 +265,71 @@ document.addEventListener("DOMContentLoaded", function () {
 
     return current.rounds
       .filter(round => round.status !== "completed")
-      .sort((a, b) =>
-        Number(b.status === "active") -
-        Number(a.status === "active") ||
-        a.number - b.number
-      )
       .flatMap(round =>
         round.matches
           .filter(match => !match.completed)
-          .map(match => ({ round, match }))
+          .map(match => ({
+            round,
+            match,
+            rest: PFApp.getRoundRestStatus(
+              round,
+              current
+            )
+          }))
+      )
+      .sort((a, b) =>
+        Number(b.round.status === "active") -
+          Number(a.round.status === "active") ||
+        Number(b.rest.ready) -
+          Number(a.rest.ready) ||
+        b.rest.minimumRest -
+          a.rest.minimumRest ||
+        a.round.number -
+          b.round.number
       );
   }
 
   function activateAndFocus(roundId, matchId) {
     try {
+      const current = session();
+      const target = PFApp.getRound(roundId, current);
+      const rest = PFApp.getRoundRestStatus(
+        target,
+        current
+      );
+
+      if (
+        !rest.ready &&
+        rest.required > 0
+      ) {
+        const readyAlternative = pendingMatches()
+          .some(item =>
+            item.round.id !== roundId &&
+            item.rest.ready
+          );
+
+        const message =
+          `${rest.tiredNames.join(", ")} belum memenuhi jeda minimal ` +
+          `${rest.required}.` +
+          (
+            readyAlternative
+              ? "\\n\\nAda pertandingan lain yang sudah lebih siap."
+              : "\\n\\nBelum ada alternatif yang sepenuhnya siap."
+          ) +
+          "\\n\\nTetap aktifkan pertandingan ini?";
+
+        if (!confirm(message)) return;
+      }
+
       const round = PFApp.activateRound(roundId);
 
       render();
 
-      PFUI.toast(`Ronde ${round.number} sekarang aktif.`);
+      PFUI.toast(
+        rest.ready
+          ? `Ronde ${round.number} aktif · pemain sudah cukup istirahat.`
+          : `Ronde ${round.number} aktif dengan override istirahat.`
+      );
 
       setTimeout(() => {
         document
@@ -239,22 +372,22 @@ document.addEventListener("DOMContentLoaded", function () {
       </div>
 
       <div class="stat">
-        <span>Kemerataan</span>
+        <span>Kemerataan roster aktif</span>
         <strong>${fairness.score}%</strong>
-        <small>${fairness.min}-${fairness.max} game/peserta</small>
+        <small>${fairness.min}-${fairness.max} game sejak R${fairness.balanceEpochRound}</small>
       </div>
 
       <div class="stat">
-        <span>Perubahan skor</span>
-        <strong>${current.scoreHistory.length}</strong>
-        <small>bisa di-undo</small>
+        <span>Minimal jeda</span>
+        <strong>${current.setup.minRestRounds ?? 1}</strong>
+        <small>${current.scoreHistory.length} perubahan skor bisa di-undo</small>
       </div>`;
 
     document.getElementById("fairnessBar").style.width =
       `${fairness.score}%`;
 
     document.getElementById("fairnessLabel").textContent =
-      `${fairness.score}% · selisih ${fairness.difference} game`;
+      `${fairness.score}% · selisih ${fairness.difference} game sejak R${fairness.balanceEpochRound}`;
   }
 
   function renderChooser() {
@@ -273,18 +406,20 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    chooser.innerHTML = items.map(({ round, match }) => {
+    chooser.innerHTML = items.map(({ round, match, rest }) => {
       const active = round.status === "active";
 
       return `
-        <div class="match-choice ${active ? "active" : ""}">
+        <div class="match-choice ${active ? "active" : ""} ${rest.ready ? "rest-ready" : "rest-warning"}">
           <div style="display:flex;justify-content:space-between;gap:7px">
             <span class="badge ${active ? "badge-success" : ""}">
-              ${round.kind === "manual_extra" ? "Tambahan · " : ""}
+              ${["manual_extra", "manual"].includes(round.kind) ? "Manual · " : ""}
               Ronde ${round.number} · Court ${match.court}
             </span>
-            <span class="list-meta">
-              ${active ? "Aktif" : "Menunggu"}
+            <span class="badge ${rest.ready ? "badge-success" : "badge-warning"}">
+              ${rest.ready
+                ? "✓ Siap"
+                : `Istirahat ${rest.tired.length}`}
             </span>
           </div>
 
@@ -294,8 +429,14 @@ document.addEventListener("DOMContentLoaded", function () {
             ${PFUI.escapeHtml(sideName(match, "B"))}
           </strong>
 
+          <div class="match-rest-note">
+            ${rest.ready
+              ? `Semua peserta memenuhi jeda minimal ${rest.required}.`
+              : `${PFUI.escapeHtml(rest.tiredNames.join(", "))} baru main dan sebaiknya istirahat dulu.`}
+          </div>
+
           <button
-            class="btn ${active ? "btn-soft" : "btn-primary"} btn-sm"
+            class="btn ${active ? "btn-soft" : rest.ready ? "btn-primary" : "btn-warning"} btn-sm"
             data-action="${active ? "view" : "activate"}"
             data-round="${round.id}"
             data-match="${match.id}">
@@ -314,7 +455,15 @@ document.addEventListener("DOMContentLoaded", function () {
       return '<span class="badge">Bisa diisi</span>';
     }
 
-    return '<span class="badge">Menunggu</span>';
+    const rest = PFApp.getMatchRestStatus(
+      round.id,
+      match.id,
+      session()
+    );
+
+    return rest.ready
+      ? '<span class="badge badge-success">Siap Istirahat</span>'
+      : '<span class="badge badge-warning">Butuh Istirahat</span>';
   }
 
   function renderMatch(round, match) {
@@ -342,8 +491,8 @@ document.addEventListener("DOMContentLoaded", function () {
         <div class="match-top">
           <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
             <span class="court">Court ${match.court}</span>
-            ${match.isManualExtra
-              ? '<span class="badge badge-warning">Match Tambahan</span>'
+            ${["manual_extra", "manual"].includes(round.kind)
+              ? '<span class="badge badge-warning">Manual</span>'
               : ""}
           </div>
           ${matchStatus(round, match)}
@@ -416,7 +565,7 @@ document.addEventListener("DOMContentLoaded", function () {
               Aktifkan Match Ini
             </button>` : ""}
 
-          ${match.isManualExtra &&
+          ${["manual_extra", "manual"].includes(round.kind) &&
             !match.completed &&
             current.status !== "completed" ? `
             <button
@@ -424,7 +573,7 @@ document.addEventListener("DOMContentLoaded", function () {
               data-action="delete-extra"
               data-round="${round.id}"
               data-match="${match.id}">
-              Hapus Match Tambahan
+              Hapus Match Manual
             </button>` : ""}
         </div>
       </div>`;
@@ -468,9 +617,11 @@ document.addEventListener("DOMContentLoaded", function () {
       roundsContainer.innerHTML = `
         <div class="card">
           <div class="empty">
-            <div class="empty-icon">⌕</div>
-            <strong>Tidak ada ronde yang cocok</strong>
-            <div>Ubah filter atau pencarian.</div>
+            <div class="empty-icon">＋</div>
+            <strong>${current.rounds.length ? "Tidak ada ronde yang cocok" : "Turnamen dimulai dari 0 match"}</strong>
+            <div>${current.rounds.length
+              ? "Ubah filter atau pencarian."
+              : "Gunakan Tambah Match Manual di atas untuk membuat pertandingan pertama."}</div>
           </div>
         </div>`;
       return;
@@ -482,11 +633,12 @@ document.addEventListener("DOMContentLoaded", function () {
           <div>
             <strong>
               Ronde ${round.number}
-              ${round.kind === "manual_extra"
-                ? '<span class="badge badge-warning manual-extra-label">Tambahan</span>'
+              ${["manual_extra", "manual"].includes(round.kind)
+                ? '<span class="badge badge-warning manual-extra-label">Manual</span>'
                 : ""}
             </strong>
             <small>
+              ${round.label ? `${PFUI.escapeHtml(round.label)} · ` : ""}
               ${round.matches.filter(match => match.completed).length}
               dari ${round.matches.length} match selesai
             </small>
@@ -512,7 +664,11 @@ document.addEventListener("DOMContentLoaded", function () {
             ${round.status === "scheduled" &&
               current.status !== "completed" ? `
               <button
-                class="btn btn-secondary btn-sm"
+                class="btn ${
+                  PFApp.getRoundRestStatus(round, current).ready
+                    ? "btn-secondary"
+                    : "btn-warning"
+                } btn-sm"
                 data-action="activate-round"
                 data-round="${round.id}">
                 Aktifkan Ronde
@@ -650,12 +806,20 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (button.dataset.action === "activate-round") {
-        const round = PFApp.activateRound(
+        const round = PFApp.getRound(
           button.dataset.round
         );
 
-        render();
-        PFUI.toast(`Ronde ${round.number} aktif.`);
+        const match = round?.matches.find(
+          item => !item.completed
+        );
+
+        if (round && match) {
+          activateAndFocus(
+            round.id,
+            match.id
+          );
+        }
       }
 
       if (button.dataset.action === "edit-score") {
@@ -673,7 +837,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       if (button.dataset.action === "delete-extra") {
-        if (!confirm("Hapus match tambahan ini?")) {
+        if (!confirm("Hapus match manual ini?")) {
           return;
         }
 
@@ -683,7 +847,7 @@ document.addEventListener("DOMContentLoaded", function () {
         );
 
         render();
-        PFUI.toast("Match tambahan dihapus.");
+        PFUI.toast("Match manual dihapus.");
       }
     } catch (error) {
       PFUI.toast(error.message);
@@ -727,7 +891,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       renderExtraMatchBuilder();
       PFUI.toast(
-        "Peserta diacak dengan prioritas jumlah main paling sedikit."
+        "Peserta diacak: yang sudah cukup istirahat diprioritaskan, lalu jumlah main paling sedikit."
       );
     } catch (error) {
       PFUI.toast(error.message);
@@ -743,6 +907,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
   createExtraMatch.addEventListener("click", function () {
     try {
+      const selectedRest = PFApp.getManualCreationRestStatus(
+        extraSelection.filter(Boolean),
+        session()
+      );
+
+      if (
+        activateExtraMatch.checked &&
+        !selectedRest.ready &&
+        selectedRest.required > 0 &&
+        !confirm(
+          `${selectedRest.tiredNames.join(", ")} belum cukup istirahat.\n\nTetap buat dan aktifkan sekarang?`
+        )
+      ) {
+        return;
+      }
+
       const result = PFApp.addManualMatch(
         extraSelection,
         {
@@ -759,7 +939,7 @@ document.addEventListener("DOMContentLoaded", function () {
       render();
 
       PFUI.toast(
-        `Match tambahan dibuat. Bobot kompensasi +${result.compensationPerMissed} per game tertinggal.`
+        `Match manual dibuat. Bobot kompensasi +${result.compensationPerMissed}; urutan akan diprioritaskan berdasarkan waktu istirahat.`
       );
 
       if (result.round.status === "active") {
@@ -837,7 +1017,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   completeTournament.addEventListener("click", function () {
     try {
-      PFApp.completeTournament(false);
+      PFApp.completeTournament();
       PFUI.toast("Turnamen ditandai selesai.");
 
       setTimeout(() => {

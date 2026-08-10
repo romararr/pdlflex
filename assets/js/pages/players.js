@@ -51,6 +51,23 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
+    if (session.setup.scheduleMode === "manual") {
+      recommendation.innerHTML =
+        `<strong>Manual · 0 Match:</strong>
+         setelah tombol Mulai Turnamen ditekan, halaman Operator dibuka tanpa
+         pertandingan. Match dibuat satu per satu dengan memilih
+         ${isTeam ? "2 tim" : "4 pemain"}.
+         Sistem akan memberi status <strong>Siap</strong> atau
+         <strong>Butuh Istirahat</strong> berdasarkan jeda minimal
+         ${session.setup.minRestRounds ?? 1}.`;
+
+      submitButton.textContent =
+        "Mulai Turnamen dengan 0 Match";
+
+      submitButton.disabled = session.submitted;
+      return;
+    }
+
     const result = PFApp.getRecommendation(
       session,
       session.submitted ? null : []
@@ -69,18 +86,36 @@ document.addEventListener("DOMContentLoaded", function () {
       ? `${result.minCourts}-${result.maxCourtsUsed} court per ronde`
       : `${result.maxCourtsUsed} court per ronde`;
 
+    const restText =
+      Number(session.setup.minRestRounds || 0) > 0
+        ? (
+            result.restPenalty === 0
+              ? `Jeda ${session.setup.minRestRounds} ronde terpenuhi tanpa pemain berturut-turut.`
+              : `Jeda dioptimalkan; ${result.restPenalty} overlap masih tidak dapat dihindari.`
+          )
+        : "Tanpa batas jeda.";
+
+    const balanceScope =
+      session.submitted &&
+      Number(session.balanceEpochRound || 1) > 1
+        ? ` sejak perubahan roster di R${session.balanceEpochRound}`
+        : "";
+
     recommendation.innerHTML =
       result.exact
-        ? `<strong>Pemerataan penuh:</strong>
-           ${result.rounds} ronde tambahan,
+        ? `<strong>Jadwal otomatis siap:</strong>
+           ${result.rounds} ronde,
            ${courtText}, dan setiap
-           ${isTeam ? "tim" : "pemain"} mencapai
-           ${result.minGames} game.`
+           ${isTeam ? "tim" : "pemain"} mendapat sekitar
+           ${result.minGames} game${balanceScope}.<br>${restText}`
         : `<strong>Pemerataan terbaik:</strong>
-           ${result.rounds} ronde tambahan,
+           ${result.rounds} ronde,
            ${courtText}, dengan hasil
            ${result.minGames}-${result.maxGames} game per
-           ${isTeam ? "tim" : "pemain"}.`;
+           ${isTeam ? "tim" : "pemain"}.<br>${restText}`;
+
+    submitButton.textContent =
+      "Submit & Buat Jadwal Otomatis";
 
     submitButton.disabled = session.submitted;
   }
@@ -143,7 +178,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ${readOnly ? "disabled" : ""}>
                 ${entity.active === false
                   ? "Aktifkan"
-                  : "Istirahatkan"}
+                  : "Nonaktifkan"}
               </button>
 
               <button
@@ -197,9 +232,11 @@ document.addEventListener("DOMContentLoaded", function () {
       render();
 
       PFUI.toast(
-        rebuilt
-          ? `${name} ditambahkan. ${rebuilt.generated} ronde mendatang dibuat ulang.`
-          : `${name} ditambahkan.`
+        rebuilt?.manual
+          ? `${name} ditambahkan. Match manual yang sudah dibuat tetap aman.`
+          : rebuilt
+            ? `${name} ditambahkan. ${rebuilt.generated} ronde mendatang dibuat ulang.`
+            : `${name} ditambahkan.`
       );
     } catch (error) {
       PFUI.toast(error.message);
@@ -231,9 +268,11 @@ document.addEventListener("DOMContentLoaded", function () {
       render();
 
       PFUI.toast(
-        rebuilt
-          ? `${createdName} ditambahkan. Jadwal mendatang disusun ulang.`
-          : `${createdName} ditambahkan.`
+        rebuilt?.manual
+          ? `${createdName} ditambahkan. Match manual yang sudah dibuat tetap aman.`
+          : rebuilt
+            ? `${createdName} ditambahkan. Jadwal mendatang disusun ulang.`
+            : `${createdName} ditambahkan.`
       );
     } catch (error) {
       PFUI.toast(error.message);
@@ -292,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function () {
         PFUI.toast(
           `${entity.name} ${nextActive
             ? "diaktifkan"
-            : "diistirahatkan"}.`
+            : "dinonaktifkan"}.`
         );
       }
 
@@ -319,7 +358,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const result = PFApp.submitTournament();
 
       PFUI.toast(
-        `${result.generated} ronde berhasil dibuat.`
+        result.manual
+          ? "Turnamen dimulai dengan 0 match. Tambahkan pertandingan dari halaman Operator."
+          : `${result.generated} ronde berhasil dibuat otomatis.`
       );
 
       setTimeout(() => {

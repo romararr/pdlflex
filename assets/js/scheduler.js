@@ -90,33 +90,6 @@
     return metrics;
   }
 
-  function selectEntities(entities, slots, metrics) {
-    return [...entities]
-      .sort((a, b) => {
-        const playDiff =
-          (metrics.playCount.get(a.id) || 0) -
-          (metrics.playCount.get(b.id) || 0);
-
-        if (playDiff !== 0) return playDiff;
-
-        const lastDiff =
-          (metrics.lastPlayed.get(a.id) || 0) -
-          (metrics.lastPlayed.get(b.id) || 0);
-
-        if (lastDiff !== 0) return lastDiff;
-
-        const joinedDiff =
-          (a.joinedAtRound || 1) -
-          (b.joinedAtRound || 1);
-
-        if (joinedDiff !== 0) return joinedDiff;
-
-        return String(a.name || "")
-          .localeCompare(String(b.name || ""));
-      })
-      .slice(0, slots);
-  }
-
   function combinationsOfFour(items) {
     const groups = [];
 
@@ -313,79 +286,21 @@
     return matches;
   }
 
-  function buildRounds(
-    session,
-    count,
-    startNumber,
-    preservedRounds
-  ) {
-    const entities = getEntities(session);
-    const courts = usableCourts(session);
-    const perCourt = entitiesPerCourt(session);
-
-    if (
-      entities.length < perCourt ||
-      courts < 1 ||
-      count < 1
-    ) {
-      return [];
-    }
-
-    const metrics = createMetrics(session, preservedRounds);
-    const rounds = [];
-
-    for (let offset = 0; offset < count; offset++) {
-      const number = startNumber + offset;
-      const selected = selectEntities(
-        entities,
-        courts * perCourt,
-        metrics
-      );
-
-      const matches =
-        session.setup.randomMode === "team"
-          ? buildTeamMatches(
-              selected,
-              courts,
-              number,
-              metrics
-            )
-          : buildPlayerMatches(
-              selected,
-              courts,
-              number,
-              metrics
-            );
-
-      const playing = matches.flatMap(match =>
-        matchEntityIds(session, match)
-      );
-
-      rounds.push({
-        id: PFStorage.uid("round"),
-        number,
-        status: "scheduled",
-        createdAt: new Date().toISOString(),
-        matches,
-        resting: entities
-          .filter(entity => !playing.includes(entity.id))
-          .map(entity => entity.id)
-      });
-    }
-
-    return rounds;
-  }
-
   function countAppearances(
     session,
     entities,
-    rounds
+    rounds,
+    fromRound = 1
   ) {
     const counts = new Map(
       entities.map(entity => [entity.id, 0])
     );
 
     rounds.forEach(round => {
+      if (Number(round.number || 0) < Number(fromRound || 1)) {
+        return;
+      }
+
       round.matches.forEach(match => {
         matchEntityIds(session, match).forEach(id => {
           if (counts.has(id)) {
@@ -398,13 +313,286 @@
     return entities.map(entity => counts.get(entity.id) || 0);
   }
 
+
+  function roundEntitySet(
+    session,
+    round
+  ) {
+    return new Set(
+      round.matches.flatMap(match =>
+        matchEntityIds(session, match)
+      )
+    );
+  }
+
+  function getRecentRoundSets(
+    session,
+    rounds,
+    count
+  ) {
+    if (count <= 0) return [];
+
+    return [...rounds]
+      .filter(round => round.matches?.length)
+      .sort((a, b) =>
+        Number(a.number || 0) - Number(b.number || 0)
+      )
+      .slice(-count)
+      .map(round =>
+        roundEntitySet(session, round)
+      );
+  }
+
+  function overlapCount(
+    selectedIds,
+    previousSet
+  ) {
+    if (!previousSet) return 0;
+
+    return selectedIds.reduce(
+      (total, id) =>
+        total + (previousSet.has(id) ? 1 : 0),
+      0
+    );
+  }
+
+  function candidateRestPenalty(
+    selectedIds,
+    recentSets,
+    requiredRest
+  ) {
+    if (requiredRest <= 0) return 0;
+
+    return recentSets
+      .slice(-requiredRest)
+      .reverse()
+      .reduce((penalty, previousSet, index) => {
+        const weight =
+          requiredRest - index;
+
+        return (
+          penalty +
+          overlapCount(selectedIds, previousSet) *
+          weight
+        );
+      }, 0);
+  }
+
+  function optimizePlanRestOrder(
+    plan,
+    requiredRest,
+    initialRecentSets = []
+  ) {
+    if (
+      requiredRest <= 0 ||
+      plan.length <= 1
+    ) {
+      return {
+        plan: plan.map(round => [...round]),
+        restPenalty: 0
+      };
+    }
+
+    const remaining = plan.map(
+      (selectedIds, index) => ({
+        selectedIds: [...selectedIds],
+        index
+      })
+    );
+
+    const ordered = [];
+    const recentSets = initialRecentSets.map(
+      set => new Set(set)
+    );
+
+    let totalPenalty = 0;
+
+    while (remaining.length) {
+      remaining.sort((a, b) => {
+        const penaltyA = candidateRestPenalty(
+          a.selectedIds,
+          recentSets,
+          requiredRest
+        );
+
+        const penaltyB = candidateRestPenalty(
+          b.selectedIds,
+          recentSets,
+          requiredRest
+        );
+
+        return (
+          penaltyA - penaltyB ||
+          a.index - b.index
+        );
+      });
+
+      const next = remaining.shift();
+
+      totalPenalty += candidateRestPenalty(
+        next.selectedIds,
+        recentSets,
+        requiredRest
+      );
+
+      ordered.push(next.selectedIds);
+      recentSets.push(new Set(next.selectedIds));
+
+      if (recentSets.length > requiredRest) {
+        recentSets.shift();
+      }
+    }
+
+    return {
+      plan: ordered,
+      restPenalty: totalPenalty
+    };
+  }
+
+  function buildSequentialRestPlan(
+    participants,
+    capacities,
+    requiredRest,
+    initialRecentSets,
+    attempt = 0
+  ) {
+    const remaining = new Map(
+      participants.map(item => [
+        item.id,
+        item.deficit
+      ])
+    );
+
+    const selectedCount = new Map(
+      participants.map(item => [
+        item.id,
+        0
+      ])
+    );
+
+    const recentSets = initialRecentSets.map(
+      set => new Set(set)
+    );
+
+    const plan = [];
+
+    for (
+      let roundIndex = 0;
+      roundIndex < capacities.length;
+      roundIndex++
+    ) {
+      const slots = capacities[roundIndex];
+      const roundsLeft =
+        capacities.length - roundIndex;
+
+      const mustPlay = participants
+        .filter(item => {
+          const deficit =
+            remaining.get(item.id) || 0;
+
+          return (
+            deficit > 0 &&
+            deficit >= roundsLeft
+          );
+        });
+
+      if (mustPlay.length > slots) {
+        return null;
+      }
+
+      const selected = mustPlay.map(
+        item => item.id
+      );
+
+      const selectedSet = new Set(selected);
+
+      const candidates = participants
+        .filter(item =>
+          !selectedSet.has(item.id) &&
+          (remaining.get(item.id) || 0) > 0
+        )
+        .map((item, index) => ({
+          item,
+          deficit:
+            remaining.get(item.id) || 0,
+          restPenalty:
+            candidateRestPenalty(
+              [item.id],
+              recentSets,
+              requiredRest
+            ),
+          selected:
+            selectedCount.get(item.id) || 0,
+          tie:
+            (
+              index * 37 +
+              attempt * 53 +
+              roundIndex * 17
+            ) % 997
+        }))
+        .sort((a, b) =>
+          a.restPenalty - b.restPenalty ||
+          b.deficit - a.deficit ||
+          a.item.current - b.item.current ||
+          a.selected - b.selected ||
+          b.item.joinedAtRound - a.item.joinedAtRound ||
+          a.tie - b.tie ||
+          a.item.name.localeCompare(b.item.name)
+        );
+
+      for (const candidate of candidates) {
+        if (selected.length >= slots) break;
+
+        selected.push(candidate.item.id);
+        selectedSet.add(candidate.item.id);
+      }
+
+      if (selected.length !== slots) {
+        return null;
+      }
+
+      for (const id of selected) {
+        const deficit =
+          remaining.get(id) || 0;
+
+        if (deficit <= 0) {
+          return null;
+        }
+
+        remaining.set(id, deficit - 1);
+        selectedCount.set(
+          id,
+          (selectedCount.get(id) || 0) + 1
+        );
+      }
+
+      plan.push(selected);
+      recentSets.push(new Set(selected));
+
+      if (recentSets.length > requiredRest) {
+        recentSets.shift();
+      }
+    }
+
+    if (
+      [...remaining.values()]
+        .some(value => value !== 0)
+    ) {
+      return null;
+    }
+
+    return plan;
+  }
+
   function simulateAdaptivePlan(
     entities,
     currentCounts,
     finalTargets,
     maxCourts,
     perCourt,
-    maxRounds
+    maxRounds,
+    requiredRest = 0,
+    initialRecentSets = []
   ) {
     const participants = entities.map((entity, index) => ({
       id: entity.id,
@@ -423,10 +611,20 @@
       0
     );
 
-    if (totalAppearances === 0) return [];
-    if (totalAppearances % perCourt !== 0) return null;
+    if (totalAppearances === 0) {
+      return {
+        plan: [],
+        restPenalty: 0
+      };
+    }
 
-    const totalMatches = totalAppearances / perCourt;
+    if (totalAppearances % perCourt !== 0) {
+      return null;
+    }
+
+    const totalMatches =
+      totalAppearances / perCourt;
+
     const maximumDeficit = Math.max(
       ...participants.map(item => item.deficit),
       0
@@ -442,13 +640,26 @@
       maxRounds
     );
 
+    let bestPlan = null;
+
     for (
       let roundCount = minimumRounds;
       roundCount <= maximumRounds;
       roundCount++
     ) {
-      const baseMatches = Math.floor(totalMatches / roundCount);
-      const extraRounds = totalMatches % roundCount;
+      if (
+        participants.some(
+          item => item.deficit > roundCount
+        )
+      ) {
+        continue;
+      }
+
+      const baseMatches =
+        Math.floor(totalMatches / roundCount);
+
+      const extraRounds =
+        totalMatches % roundCount;
 
       if (
         baseMatches < 1 ||
@@ -464,66 +675,52 @@
       const capacities = Array.from(
         { length: roundCount },
         (_, index) =>
-          (baseMatches + (index < extraRounds ? 1 : 0)) * perCourt
+          (
+            baseMatches +
+            (index < extraRounds ? 1 : 0)
+          ) * perCourt
       );
 
-      const plan = Array.from(
-        { length: roundCount },
-        () => []
-      );
-
-      const orderedParticipants = [...participants]
-        .filter(item => item.deficit > 0)
-        .sort((a, b) =>
-          b.deficit - a.deficit ||
-          a.current - b.current ||
-          b.joinedAtRound - a.joinedAtRound ||
-          a.name.localeCompare(b.name)
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const rawPlan = buildSequentialRestPlan(
+          participants,
+          capacities,
+          requiredRest,
+          initialRecentSets,
+          attempt
         );
 
-      let failed = false;
+        if (!rawPlan) continue;
 
-      for (const participant of orderedParticipants) {
-        const availableRounds = capacities
-          .map((capacity, index) => ({
-            index,
-            capacity,
-            size: plan[index].length
-          }))
-          .filter(item => item.capacity > 0)
-          .sort((a, b) =>
-            b.capacity - a.capacity ||
-            a.size - b.size ||
-            a.index - b.index
-          );
+        const optimized = optimizePlanRestOrder(
+          rawPlan,
+          requiredRest,
+          initialRecentSets
+        );
 
-        if (availableRounds.length < participant.deficit) {
-          failed = true;
-          break;
+        const candidate = {
+          plan: optimized.plan,
+          restPenalty: optimized.restPenalty
+        };
+
+        if (
+          !bestPlan ||
+          candidate.restPenalty < bestPlan.restPenalty ||
+          (
+            candidate.restPenalty === bestPlan.restPenalty &&
+            candidate.plan.length < bestPlan.plan.length
+          )
+        ) {
+          bestPlan = candidate;
         }
 
-        availableRounds
-          .slice(0, participant.deficit)
-          .forEach(item => {
-            plan[item.index].push(participant.id);
-            capacities[item.index]--;
-          });
-      }
-
-      if (
-        !failed &&
-        capacities.every(capacity => capacity === 0) &&
-        plan.every(selected =>
-          selected.length >= perCourt &&
-          selected.length % perCourt === 0 &&
-          new Set(selected).size === selected.length
-        )
-      ) {
-        return plan;
+        if (candidate.restPenalty === 0) {
+          return candidate;
+        }
       }
     }
 
-    return null;
+    return bestPlan;
   }
 
   function buildRecommendedRounds(
@@ -610,10 +807,16 @@
       };
     }
 
+    const balanceEpochRound = Math.max(
+      1,
+      Number(session.balanceEpochRound || 1)
+    );
+
     const currentCounts = countAppearances(
       session,
       entities,
-      preservedRounds
+      preservedRounds,
+      balanceEpochRound
     );
 
     const currentMaximum = Math.max(...currentCounts, 0);
@@ -628,6 +831,17 @@
     );
 
     const maxSlots = maxCourts * perCourt;
+    const requiredRest = Math.max(
+      0,
+      Number(session.setup.minRestRounds ?? 1)
+    );
+
+    const recentRoundSets = getRecentRoundSets(
+      session,
+      preservedRounds,
+      requiredRest
+    );
+
     let best = null;
 
     for (
@@ -665,16 +879,20 @@
           continue;
         }
 
-        const plan = simulateAdaptivePlan(
+        const simulation = simulateAdaptivePlan(
           entities,
           currentCounts,
           finalTargets,
           maxCourts,
           perCourt,
-          maxRounds
+          maxRounds,
+          requiredRest,
+          recentRoundSets
         );
 
-        if (!plan) continue;
+        if (!simulation) continue;
+
+        const plan = simulation.plan;
 
         const courtPattern = plan.map(
           selectedIds => selectedIds.length / perCourt
@@ -703,28 +921,37 @@
           slotsPerRound: maxSlots,
           currentCounts,
           finalTargets,
-          plan
+          plan,
+          requiredRest,
+          restPenalty: simulation.restPenalty,
+          balanceEpochRound
         };
 
         if (
           !best ||
-          candidate.rounds < best.rounds ||
+          candidate.maxGames < best.maxGames ||
           (
-            candidate.rounds === best.rounds &&
-            candidate.maxGames < best.maxGames
-          ) ||
-          (
-            candidate.rounds === best.rounds &&
             candidate.maxGames === best.maxGames &&
             candidate.exact &&
             !best.exact
+          ) ||
+          (
+            candidate.maxGames === best.maxGames &&
+            candidate.exact === best.exact &&
+            candidate.restPenalty < best.restPenalty
+          ) ||
+          (
+            candidate.maxGames === best.maxGames &&
+            candidate.exact === best.exact &&
+            candidate.restPenalty === best.restPenalty &&
+            candidate.rounds < best.rounds
           )
         ) {
           best = candidate;
         }
       }
 
-      if (best && best.maxGames <= baseTarget + 1) {
+      if (best) {
         break;
       }
     }
@@ -740,10 +967,16 @@
 
   function fairness(session) {
     const entities = getEntities(session);
+    const balanceEpochRound = Math.max(
+      1,
+      Number(session.balanceEpochRound || 1)
+    );
+
     const counts = countAppearances(
       session,
       entities,
-      session.rounds
+      session.rounds,
+      balanceEpochRound
     );
 
     if (!counts.length) {
@@ -751,7 +984,8 @@
         score: 0,
         min: 0,
         max: 0,
-        difference: 0
+        difference: 0,
+        balanceEpochRound
       };
     }
 
@@ -763,16 +997,14 @@
       min,
       max,
       difference,
-      score: Math.max(0, 100 - difference * 25)
+      score: Math.max(0, 100 - difference * 25),
+      balanceEpochRound
     };
   }
 
   window.PFScheduler = {
     getEntities,
-    entitiesPerCourt,
-    usableCourts,
     matchEntityIds,
-    buildRounds,
     buildRecommendedRounds,
     recommend,
     fairness

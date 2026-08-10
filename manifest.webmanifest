@@ -1,7 +1,7 @@
 {
-  "name": "PadelFlex Pro v4.1",
+  "name": "PadelFlex Pro v4.4",
   "short_name": "PadelFlex",
-  "description": "Local-first padel tournament manager dengan match tambahan manual",
+  "description": "Local-first padel tournament manager: manual 0 match, rest-aware, join-aware, stable QA",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

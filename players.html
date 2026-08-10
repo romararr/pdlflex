@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <meta name="description" content="PadelFlex Pro v4.1 - padel tournament manager tanpa database">
+  <meta name="description" content="PadelFlex Pro v4.4 - padel tournament manager tanpa database">
   <title>Kelola Peserta — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
@@ -17,7 +17,7 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4.1 · Local-first</small>
+          <small>Version 4.4 · Stable QA</small>
         </span>
       </a>
 
@@ -165,8 +165,8 @@
 
       <div class="info hidden" id="midSessionNotice" style="margin-top:14px">
         <strong>Penambahan tengah turnamen.</strong>
-        Ronde aktif dan seluruh skor lama dipertahankan. Jadwal setelahnya
-        dihitung ulang agar kembali merata.
+        Skor dan match yang sudah dibuat tetap aman. Pada mode Manual, roster
+        hanya diperbarui; pada mode Otomatis, jadwal mendatang dihitung ulang.
       </div>
 
       <div class="list" id="entityList" style="margin-top:17px"></div>
@@ -175,10 +175,10 @@
 
   <div class="grid">
     <div class="card">
-      <div class="card-header"><h2>Estimasi Jadwal</h2></div>
+      <div class="card-header"><h2>Mode Mulai Turnamen</h2></div>
       <div class="card-body">
         <div class="info" id="recommendation">
-          Tambahkan peserta untuk melihat estimasi.
+          Tambahkan peserta untuk melanjutkan.
         </div>
       </div>
     </div>
@@ -191,8 +191,9 @@
 
       <div class="card-body">
         <p class="hint" style="margin-top:0">
-          Sistem membuat semua ronde otomatis dengan selisih jumlah game
-          sekecil mungkin.
+          Pada mode Manual, turnamen dimulai dengan 0 match. Pada mode
+          Otomatis, sistem membuat ronde sekaligus dengan pemerataan dan jeda
+          istirahat sebagai prioritas.
         </p>
 
         <button
@@ -200,7 +201,7 @@
           id="submitTournament"
           type="button"
           style="width:100%;margin-top:10px">
-          Submit &amp; Buat Jadwal Otomatis
+          Mulai Turnamen
         </button>
 
         <button

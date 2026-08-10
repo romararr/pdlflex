@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <meta name="description" content="PadelFlex Pro v4.1 - padel tournament manager tanpa database">
+  <meta name="description" content="PadelFlex Pro v4.4 - padel tournament manager tanpa database">
   <title>Operator Pertandingan — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
@@ -17,7 +17,7 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4.1 · Local-first</small>
+          <small>Version 4.4 · Stable QA</small>
         </span>
       </a>
 
@@ -108,13 +108,14 @@
 <section class="card extra-match-builder" id="extraMatchSection" style="margin-top:18px">
   <div class="card-header">
     <div>
-      <h2>Tambah Match di Tengah Turnamen</h2>
+      <h2>Tambah Match Manual</h2>
       <div class="list-meta">
-        Pilih peserta satu per satu atau isi otomatis dengan random yang
-        memprioritaskan peserta dengan jumlah main paling sedikit.
+        Turnamen boleh dimulai dari 0 match. Pilih peserta satu per satu atau
+        gunakan random rest-aware yang memprioritaskan pemain paling segar dan
+        jumlah main paling sedikit.
       </div>
     </div>
-    <span class="badge">Match Tambahan</span>
+    <span class="badge">Manual Match</span>
   </div>
 
   <div class="card-body">
@@ -123,6 +124,12 @@
     </div>
 
     <div class="manual-player-slots" id="manualPlayerSlots"></div>
+
+    <div
+      class="rest-readiness"
+      id="extraMatchRestInfo"
+      style="margin-top:12px">
+    </div>
 
     <div class="form-grid" style="margin-top:14px">
       <div class="field">
@@ -136,7 +143,7 @@
           class="input"
           id="extraMatchLabel"
           maxlength="45"
-          value="Match Tambahan">
+          value="Match Manual">
       </div>
     </div>
 
@@ -169,7 +176,8 @@
     <div>
       <h2>Pilih Pertandingan</h2>
       <div class="list-meta">
-        Aktifkan pertandingan mana pun yang pemainnya sudah siap.
+        Match dengan badge Siap Istirahat direkomendasikan lebih dulu.
+        Match yang memakai pemain baru selesai main tetap bisa dipaksa bila diperlukan.
       </div>
     </div>
     <span class="badge" id="pendingCount">0 menunggu</span>

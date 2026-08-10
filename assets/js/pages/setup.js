@@ -5,6 +5,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const form = document.getElementById("setupForm");
   const scoreSystem = document.getElementById("scoreSystem");
   const modeOptions = document.querySelectorAll("[data-mode]");
+  const scheduleOptions = document.querySelectorAll("[data-schedule-mode]");
+  const minimumGamesField = document.getElementById("minimumGamesField");
   const resumeButton = document.getElementById("resumeTournament");
   const saveButton = document.getElementById("saveSetup");
   const locked = document.getElementById("setupLocked");
@@ -15,6 +17,8 @@ document.addEventListener("DOMContentLoaded", function () {
     session.setup.courtCount;
   document.getElementById("minimumGames").value =
     session.setup.minimumGames;
+  document.getElementById("minRestRounds").value =
+    String(session.setup.minRestRounds ?? 1);
 
   scoreSystem.value =
     session.setup.scoreMode === "manual"
@@ -27,6 +31,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (selectedMode) selectedMode.checked = true;
 
+  const selectedScheduleMode = document.querySelector(
+    `input[name="scheduleMode"][value="${session.setup.scheduleMode || "manual"}"]`
+  );
+
+  if (selectedScheduleMode) selectedScheduleMode.checked = true;
+
   function renderModes() {
     modeOptions.forEach(option => {
       const input = option.querySelector("input");
@@ -36,9 +46,39 @@ document.addEventListener("DOMContentLoaded", function () {
         input.checked
       );
     });
+
+    scheduleOptions.forEach(option => {
+      const input = option.querySelector("input");
+
+      option.classList.toggle(
+        "selected",
+        input.checked
+      );
+    });
+
+    const scheduleMode =
+      document.querySelector(
+        'input[name="scheduleMode"]:checked'
+      )?.value || "manual";
+
+    minimumGamesField.classList.toggle(
+      "hidden",
+      scheduleMode !== "auto"
+    );
   }
 
   modeOptions.forEach(option => {
+    option.addEventListener("click", function () {
+      const input = option.querySelector("input");
+
+      if (input.disabled) return;
+
+      input.checked = true;
+      renderModes();
+    });
+  });
+
+  scheduleOptions.forEach(option => {
     option.addEventListener("click", function () {
       const input = option.querySelector("input");
 
@@ -88,6 +128,13 @@ document.addEventListener("DOMContentLoaded", function () {
         ),
         minimumGames: Number(
           document.getElementById("minimumGames").value
+        ),
+        scheduleMode:
+          document.querySelector(
+            'input[name="scheduleMode"]:checked'
+          )?.value || "manual",
+        minRestRounds: Number(
+          document.getElementById("minRestRounds").value
         )
       });
 

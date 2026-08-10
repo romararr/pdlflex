@@ -17,12 +17,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const rows = [...result.sorted];
 
+    if (mode === "points") {
+      rows.sort((a, b) =>
+        Number(b.played > 0) - Number(a.played > 0) ||
+        b.points - a.points ||
+        b.diff - a.diff ||
+        b.wins - a.wins ||
+        b.scored - a.scored ||
+        a.losses - b.losses ||
+        b.ties - a.ties ||
+        a.name.localeCompare(b.name)
+      );
+    }
+
     if (mode === "wins") {
       rows.sort((a, b) =>
         Number(b.played > 0) - Number(a.played > 0) ||
         b.wins - a.wins ||
         b.points - a.points ||
         b.diff - a.diff ||
+        b.scored - a.scored ||
+        a.losses - b.losses ||
+        b.ties - a.ties ||
         a.name.localeCompare(b.name)
       );
     }
@@ -33,6 +49,9 @@ document.addEventListener("DOMContentLoaded", function () {
         b.diff - a.diff ||
         b.points - a.points ||
         b.wins - a.wins ||
+        b.scored - a.scored ||
+        a.losses - b.losses ||
+        b.ties - a.ties ||
         a.name.localeCompare(b.name)
       );
     }
@@ -43,6 +62,9 @@ document.addEventListener("DOMContentLoaded", function () {
         b.winRate - a.winRate ||
         b.played - a.played ||
         b.points - a.points ||
+        b.diff - a.diff ||
+        b.wins - a.wins ||
+        b.scored - a.scored ||
         a.name.localeCompare(b.name)
       );
     }
@@ -247,11 +269,14 @@ document.addEventListener("DOMContentLoaded", function () {
            P = skor yang dikumpulkan + kompensasi.
            Kompensasi per game yang lebih sedikit:
            <strong>${result.compensationPerMissed}</strong> poin.
-           G terbanyak: <strong>${result.maxGames}</strong>.`
+           Untuk pemain yang masuk terlambat, +M hanya dihitung dari ronde
+           <strong>setelah pemain tersebut bergabung</strong>; ronde sebelum
+           kedatangannya tidak dianggap missed game.`
         : `<strong>Skor manual:</strong>
            menang 3 poin, seri 1 poin, kalah 0 poin.
            Peserta yang tertinggal satu game mendapat
            <strong>+${result.compensationPerMissed}</strong> poin pada +M.
+           Untuk late join, kompensasi hanya dihitung sejak peserta bergabung.
            Tie-breaker menggunakan selisih skor.`;
 
     lifecycleButton.textContent =
@@ -455,7 +480,7 @@ document.addEventListener("DOMContentLoaded", function () {
         PFApp.reopenTournament();
         PFUI.toast("Turnamen dibuka kembali.");
       } else {
-        PFApp.completeTournament(false);
+        PFApp.completeTournament();
         PFUI.toast("Turnamen ditandai selesai.");
       }
 

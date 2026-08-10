@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <meta name="theme-color" content="#246bfd">
-  <meta name="description" content="PadelFlex Pro v4.1 - padel tournament manager tanpa database">
+  <meta name="description" content="PadelFlex Pro v4.4 - padel tournament manager tanpa database">
   <title>Init Turnamen — PadelFlex Pro</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
@@ -17,7 +17,7 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4.1 · Local-first</small>
+          <small>Version 4.4 · Stable QA</small>
         </span>
       </a>
 
@@ -85,7 +85,7 @@
           <div>
             <div class="eyebrow">Langkah 1</div>
             <h1>Init Turnamen</h1>
-            <p>Tentukan nama, jenis random, sistem skor, jumlah court, dan minimum game.</p>
+            <p>Tentukan nama, sistem skor, jenis random, mode jadwal, jumlah court, dan jeda istirahat.</p>
           </div>
         </div>
 
@@ -158,7 +158,7 @@
             </select>
           </div>
 
-          <div class="field">
+          <div class="field" id="minimumGamesField">
             <label for="minimumGames">Minimum game per peserta</label>
             <input
               class="input"
@@ -166,12 +166,47 @@
               type="number"
               min="1"
               max="30">
+            <div class="hint">Dipakai hanya pada mode Jadwal Otomatis.</div>
+          </div>
+
+          <div class="field">
+            <label for="minRestRounds">Minimal jeda sebelum main lagi</label>
+            <select class="select" id="minRestRounds">
+              <option value="0">Tidak dibatasi</option>
+              <option value="1">Minimal 1 pertandingan / ronde</option>
+              <option value="2">Minimal 2 pertandingan / ronde</option>
+              <option value="3">Minimal 3 pertandingan / ronde</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:15px">
+          <div class="field"><label>Mode pembuatan pertandingan</label></div>
+
+          <div class="mode-grid">
+            <label class="mode" data-schedule-mode>
+              <input type="radio" name="scheduleMode" value="manual">
+              <strong>Manual · Mulai dari 0 Match</strong>
+              <span>
+                Turnamen dimulai tanpa pertandingan. Match ditambahkan satu per
+                satu dan pemain dipilih manual atau melalui random rest-aware.
+              </span>
+            </label>
+
+            <label class="mode" data-schedule-mode>
+              <input type="radio" name="scheduleMode" value="auto">
+              <strong>Jadwal Otomatis</strong>
+              <span>
+                Sistem membuat ronde seimbang otomatis dan mengurutkannya agar
+                pemain sebisa mungkin tidak bermain berturut-turut.
+              </span>
+            </label>
           </div>
         </div>
 
         <p class="hint">
-          Jumlah ronde dihitung otomatis berdasarkan roster, court, dan
-          minimum game agar jumlah bermain semerata mungkin.
+          Mode Manual adalah default. Pada mode ini submit hanya membuka
+          turnamen dengan 0 match, lalu pertandingan dibuat dari halaman Operator.
         </p>
 
         <div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:16px">
