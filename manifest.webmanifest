@@ -1,7 +1,7 @@
 {
-  "name": "PadelFlex Pro v4.5",
+  "name": "PadelFlex Pro v4.6",
   "short_name": "PadelFlex",
-  "description": "Padel tournament manager dengan compact operator dan modal match",
+  "description": "Padel tournament manager dengan compact mobile operator, auto schedule self-repair, dan cache-safe assets",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  const BUILD_VERSION = "4.6.0";
+
   function escapeHtml(value) {
     return String(value ?? "")
       .replaceAll("&", "&amp;")
@@ -100,8 +102,13 @@
             ? `Total ${session.setup.pointsTotal}`
             : "Skor Manual";
 
+        const schedule =
+          session.setup.scheduleMode === "auto"
+            ? "Otomatis"
+            : "Manual";
+
         subtitle.textContent =
-          `${mode} · ${score} · ${session.setup.courtCount} court`;
+          `${mode} · ${score} · ${session.setup.courtCount} court · ${schedule}`;
       }
     }
   }
@@ -188,6 +195,39 @@
     return true;
   }
 
+  function cleanupOldBuildCaches() {
+    const markerKey = "padelflex_asset_build";
+
+    try {
+      if (localStorage.getItem(markerKey) === BUILD_VERSION) return;
+
+      localStorage.setItem(markerKey, BUILD_VERSION);
+
+      if ("caches" in window) {
+        caches.keys()
+          .then(keys => Promise.all(
+            keys
+              .filter(key =>
+                key.startsWith("padelflex-") &&
+                !key.includes("v4-6")
+              )
+              .map(key => caches.delete(key))
+          ))
+          .catch(() => {});
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations()
+          .then(registrations => {
+            registrations.forEach(registration => {
+              registration.update().catch(() => {});
+            });
+          })
+          .catch(() => {});
+      }
+    } catch (_) {}
+  }
+
   function registerServiceWorker() {
     if (
       "serviceWorker" in navigator &&
@@ -202,6 +242,8 @@
   }
 
   function init() {
+    cleanupOldBuildCaches();
+
     if (!guard()) return;
 
     renderNavigation();

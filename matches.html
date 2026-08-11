@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/icons/icon-192.png">
   <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/operator-v46.css?v=4.6.0">
 </head>
 <body data-page="matches">
   <div class="app-shell">
@@ -17,7 +18,7 @@
         <span class="brand-mark">PF</span>
         <span>
           <strong>PadelFlex Pro</strong>
-          <small>Version 4.5 · Compact Operator</small>
+          <small>Version 4.6 · Stable UI</small>
         </span>
       </a>
 
@@ -26,8 +27,8 @@
         <a class="nav-link" data-nav="setup" href="setup.html"><span class="nav-icon">⚙</span>Init</a>
         <a class="nav-link" data-nav="players" href="players.html"><span class="nav-icon">👥</span>Peserta</a>
         <a class="nav-link" data-nav="matches" href="matches.html"><span class="nav-icon">🎾</span>Pertandingan</a>
-        <a class="nav-link" data-nav="leaderboard" href="leaderboard.html"><span class="nav-icon">🏆</span>Leaderboard</a>
-        <a class="nav-link" data-nav="display" href="display.html"><span class="nav-icon">▣</span>Display TV</a>
+        <a class="nav-link" data-nav="leaderboard" href="leaderboard.html"><span class="nav-icon">🏆</span>Ranking</a>
+        <a class="nav-link" data-nav="display" href="display.html"><span class="nav-icon">▣</span>TV</a>
         <a class="nav-link" data-nav="settings" href="settings.html"><span class="nav-icon">☷</span>Settings</a>
       </nav>
 
@@ -57,10 +58,10 @@
           </div>
 
           <div class="operator-command-actions">
-            <button class="btn btn-primary" id="addExtraMatch" type="button">＋ Tambah Match</button>
-            <a class="btn btn-secondary" href="players.html">＋ Peserta</a>
-            <a class="btn btn-secondary" href="display.html">Display TV</a>
-            <a class="btn btn-soft" href="leaderboard.html">Leaderboard</a>
+            <button class="btn btn-primary" id="addExtraMatch" type="button">＋ Match</button>
+            <a class="btn btn-secondary" href="players.html">Peserta</a>
+            <a class="btn btn-secondary" href="display.html">TV</a>
+            <a class="btn btn-soft" href="leaderboard.html">Ranking</a>
           </div>
         </section>
 
@@ -69,7 +70,7 @@
           <div class="operator-fairness">
             <div class="operator-fairness-copy">
               <strong>Kemerataan roster aktif</strong>
-              <span id="fairnessLabel">0%</span>
+              <span id="fairnessLabel">Belum ada data</span>
             </div>
             <div class="fairness-meter">
               <div class="fairness-bar" id="fairnessBar"></div>
@@ -83,7 +84,7 @@
               <h2>Match Aktif</h2>
               <div class="list-meta" id="activeMatchSubtitle">Belum ada pertandingan aktif.</div>
             </div>
-            <span class="badge" id="activeMatchBadge">Menunggu</span>
+            <span class="badge" id="activeMatchBadge">—</span>
           </div>
           <div class="card-body compact-card-body" id="activeMatchContainer"></div>
         </section>
@@ -101,7 +102,7 @@
           </div>
         </section>
 
-        <section class="card match-history-card" style="margin-top:14px">
+        <section class="card match-history-card" id="matchHistorySection" style="margin-top:14px">
           <div class="card-header compact-card-header history-header">
             <div>
               <h2>Riwayat & Jadwal</h2>
@@ -136,7 +137,7 @@
     <div class="compact-action-buttons">
       <button class="btn btn-soft btn-sm" id="undoScore">↶ Undo</button>
       <button class="btn btn-success btn-sm" id="completeTournament">Selesaikan</button>
-      <a class="btn btn-primary btn-sm" href="leaderboard.html">Leaderboard</a>
+      <a class="btn btn-primary btn-sm" href="leaderboard.html">Ranking</a>
     </div>
   </div>
 
@@ -190,10 +191,10 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="assets/js/storage.js" defer></script>
-  <script src="assets/js/scheduler.js" defer></script>
-  <script src="assets/js/core.js" defer></script>
-  <script src="assets/js/common.js" defer></script>
-  <script src="assets/js/pages/matches.js" defer></script>
+  <script src="assets/js/storage.js?v=4.6.0" defer></script>
+  <script src="assets/js/scheduler.js?v=4.6.0" defer></script>
+  <script src="assets/js/core.js?v=4.6.0" defer></script>
+  <script src="assets/js/common.js?v=4.6.0" defer></script>
+  <script src="assets/js/pages/matches-v46.js?v=4.6.0" defer></script>
 </body>
 </html>

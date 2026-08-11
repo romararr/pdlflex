@@ -1,4 +1,4 @@
-const CACHE_NAME = "padelflex-pro-v4-5-cache-1";
+const CACHE_NAME = "padelflex-pro-v4-6-cache-1";
 const APP_FILES = [
   "./",
   "./index.html",
@@ -10,14 +10,19 @@ const APP_FILES = [
   "./settings.html",
   "./manifest.webmanifest",
   "./assets/css/app.css",
+  "./assets/css/operator-v46.css?v=4.6.0",
   "./assets/js/storage.js",
   "./assets/js/scheduler.js",
   "./assets/js/core.js",
   "./assets/js/common.js",
+  "./assets/js/storage.js?v=4.6.0",
+  "./assets/js/scheduler.js?v=4.6.0",
+  "./assets/js/core.js?v=4.6.0",
+  "./assets/js/common.js?v=4.6.0",
   "./assets/js/pages/hub.js",
   "./assets/js/pages/setup.js",
   "./assets/js/pages/players.js",
-  "./assets/js/pages/matches.js",
+  "./assets/js/pages/matches-v46.js?v=4.6.0",
   "./assets/js/pages/leaderboard.js",
   "./assets/js/pages/display.js",
   "./assets/js/pages/settings.js",
