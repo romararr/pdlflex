@@ -905,6 +905,64 @@
     session.activeRoundId = target.id;
   }
 
+  function ensureAutoSchedule() {
+    const session = requireSession();
+
+    if (
+      !session.submitted ||
+      session.status === "archived" ||
+      session.setup.scheduleMode !== "auto" ||
+      session.rounds.length > 0
+    ) {
+      return {
+        repaired: false,
+        generated: session.rounds.length
+      };
+    }
+
+    validateRoster(session);
+
+    const recommendation = getRecommendation(session, []);
+
+    if (!recommendation.available) {
+      return {
+        repaired: false,
+        generated: 0,
+        error: recommendation.reason
+      };
+    }
+
+    const generated = PFScheduler.buildRecommendedRounds(
+      session,
+      recommendation,
+      1,
+      []
+    );
+
+    if (!generated.length) {
+      return {
+        repaired: false,
+        generated: 0,
+        error: "Jadwal otomatis gagal dibuat."
+      };
+    }
+
+    session.rounds = generated;
+    session.activeRoundId = null;
+    session.roundCompletionCounter = 0;
+    session.balanceEpochRound = 1;
+
+    activateRoundInternal(session, generated[0]);
+    touch(session);
+    persist();
+
+    return {
+      repaired: true,
+      generated: generated.length,
+      recommendation
+    };
+  }
+
   function submitTournament() {
     const session = requireSession();
     ensureTournamentWritable(session);
@@ -2199,6 +2257,7 @@
     setEntityActive,
     removeEntity,
     getRecommendation,
+    ensureAutoSchedule,
     submitTournament,
     activateRound,
     setScore,
